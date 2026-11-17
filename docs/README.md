@@ -42,3 +42,4 @@ Every change made to this repository must honor the following invariants:
 3. **MFA Guarded Sensitive Actions**: Critical operations (financial transfers, disciplinary deductions, consensus voting, role modifications) strictly enforce 6-digit TOTP verification via `FreshMfaGuard`.
 4. **Institutional Integrity**: All real employee accounts are restricted to the institutional domain (`@seu.edu.bd`). Dummy seed accounts (`@pointfex.internal`) remain suspended from active business operations.
 5. **Universal Transparency**: The public leaderboard is accessible to all verified employees with sensitive financial fields stripped, normalizing unrecorded states to `0.00` and `0 XP`.
+

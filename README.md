@@ -1,8 +1,8 @@
-# Pointfex ERP (`v3.14.0`)
+# Pointfex ERP (`v4.0.0`)
 
 Production-grade, Zero-Trust Enterprise Resource Planning (ERP) platform built with **NestJS + TypeScript + Prisma + PostgreSQL (Neon)** and **React 19 + TypeScript + Vite + Tailwind CSS**.
 
-Engineered for strict organizational governance, server-enforced role tiers, executive voting, maker-checker segregation of duties (SoD), time-boxed authority delegations, tamper-evident audit logging, hierarchical KPI & XP gamification suite, and resilient serverless deployment on Vercel.
+Engineered for strict organizational governance, server-enforced role tiers, executive voting consensus, maker-checker segregation of duties (SoD), time-boxed authority delegations, tamper-evident audit logging, hierarchical KPI & XP gamification suite, and resilient serverless deployment on Vercel.
 
 ---
 
@@ -13,6 +13,7 @@ Engineered for strict organizational governance, server-enforced role tiers, exe
                                │           Client Browser (React 19 SPA)      │
                                │  - Cross-Tab BroadcastChannel Logout Sync     │
                                │  - 30-min Idle Timeout with 60s Warning Modal │
+                               │  - Unified Design System & Reactive States   │
                                │  - Live Password Strength Meter (Policy Rules)│
                                └──────────────────────┬────────────────────────┘
                                                       │ HTTPS / HttpOnly SameSite=Strict Cookies
@@ -32,12 +33,19 @@ Engineered for strict organizational governance, server-enforced role tiers, exe
                                │  │   ├── JwtAuthGuard (Family Refresh Token)  │
                                │  │   ├── FreshMfaGuard (±1 step TOTP & Replay)│
                                │  │   └── PermissionsGuard (Dynamic PBAC)      │
+                               │  ├── Performance & Gamification (v4.0.0):     │
+                               │  │   ├── Pure KPI Engine (Mathematical Parity)│
+                               │  │   ├── Event-Sourced XP Ledger (ADR-001 A)  │
+                               │  │   ├── Advisory Lock Concurrency (pg_lock)  │
+                               │  │   ├── Frozen-XP Consensus Quorum (>50% C)  │
+                               │  │   ├── PM Milestone XP Invariant            │
+                               │  │   └── Idempotent Weekly Sweep (Dhaka Time) │
                                │  ├── Governance & Authorization:              │
                                │  │   ├── Tier Ceiling (CEO > EXEC > MGR > STF)│
                                │  │   ├── CEO Direct Power (Instant Apply)     │
                                │  │   ├── Executive Voting Engine (50%+ Pass)  │
-                               │  │   ├── Project Creation Stepper (BDT Budget)│
-                               │  │   └── Developer Proposals (HR Grievance)   │
+                               │  │   ├── Strict Permission-View Sync (PBAC)   │
+                               │  │   └── Disciplinary Deductions (1-100 Pts)  │
                                │  ├── Security & Automation:                   │
                                │  │   ├── Automated Sweeper (/api/cron/sweep)  │
                                │  │   ├── Allowlist Engine (CEO Exact Emails)  │
@@ -54,38 +62,59 @@ Engineered for strict organizational governance, server-enforced role tiers, exe
 
 ---
 
-## 2. Key Capabilities (`v3.14.0`)
+## 2. Key Capabilities (`v4.0.0`)
 
-### A. Pointfex KPI & XP Governance Suite
-- **Top Priority Hero Placement:** Injected dynamic KPI Trend Line Graph and Career XP Stacked Bar Chart into the absolute top priority hero segment of the main dashboard for all roles (Developer, PM, C-Level, CEO).
-- **Hierarchical Evaluations & Mathematical Formulas:**
+### A. Pointfex KPI & XP Governance Suite (Core Engine)
+- **Top Priority Hero Placement:** Dynamic KPI Trend Line Graph and Career XP Stacked Bar Chart in the top priority hero segment for all roles (Developer, PM, C-Level, CEO).
+- **Pure Mathematical Engine (`backend/src/performance/kpi-engine/`):**
+  - Completely decoupled, dependency-free TypeScript engine operating with deterministic precision and verified mathematical parity across legacy formulas.
   - **Level 1 (Developers):** 50% PM Score, 15% CTO, 15% CPO, 10% CFO, 10% CHRO with auto-drafted C-Level score requiring read-receipt confirmation. Context multipliers: Main Squad (100%), Outside Squad (70%), Isolated Executive Task (50%).
   - **Level 2 (Project Managers):** 30% CTO, 30% CPO, 20% CFO, 20% CHRO based on squad outcomes. PMs receive XP strictly from macro project milestones upon C-Level sign-off, bypassing self-assigned micro-tasks.
   - **Level 3 (C-Level):** 40% Macro Goals, 30% Domain Execution (squad average), 20% CEO Review, 10% Peer Synergy.
   - **Level 4 (CEO):** 60% Company Performance, 40% C-Level Aggregate.
-- **Inactivity Detection & Return Penalties:** Zero tasks completed in a week flags the KPI as "N/A" with a prominent visual red marker on the trend line, automatically triggering a 10% deduction on the score of the next evaluated task upon return.
-- **Executive Governance & MFA Override Gate:**
-  - **CEO Supreme Authority (Strictly MFA-Only):** Bypasses all written justifications and secondary approvals; strictly and only requires 6-digit MFA verification code.
-  - **CHRO Full Governance:** Universal authority for CHRO (`2023200000066@seu.edu.bd`) across all employees' KPI/XP, final weight verifications, and audit log editing/annotation (`PATCH /api/performance/audit-log/:id`).
-  - **C-Level & PM Authority:** C-Level and PMs can adjust records according to authorized squad and executive powers with MFA verification.
-- **Cryptographic Audit Ledger:** Immutable ledger chained with SHA-256 hashes recording delta, authorized executive, trigger event, and sequence.
-- **Clean Profile Separation:** Removed KPI/XP elements from profile settings (`MyAccountPage`) to maintain strict separation between personal security credentials and operational gamification standing.
+- **Event-Sourced XP Ledger (`xp_ledger_entries`, ADR-001 Option A):**
+  - Ledger rows are strictly immutable events (`AWARD_PENDING`, `VERIFY_RELEASE`, `FREEZE`, `RELEASE_FROZEN`, `REVERSAL`, `ADJUSTMENT`).
+  - High-concurrency write protection via PostgreSQL transactional advisory locks (`pg_advisory_xact_lock(hash(userId))`), guaranteeing gap-free sequences and SHA-256 hash chains per employee.
+  - Materialized projections cached in mutable `xp_balances` with drift verification.
+- **Frozen-XP Consensus Quorum (`FrozenXpConsensusService`):**
+  - Massive XP threshold ($\ge 200\text{ XP}$) automatically opens a 7-day executive consensus request.
+  - Quorum rule: strictly more than half ($> 50\%$) of active eligible C-Suite seats (`CTO`, `CPO`, `CFO`, `CHRO`), excluding proposer and beneficiary. Double-voting prevented; fresh MFA required.
+- **CHRO Task Weight Gate & Disciplinary Governance:**
+  - Tasks with proposed weights require formal pre-verification by CHRO (`2023200000066@seu.edu.bd`) prior to XP release.
+  - Formal disciplinary deductions ($1 \le p \le 100$) require legal/HR reference documentation and produce compensatory reversal entries if contested.
+  - Discretionary cash inputs (`MoneyInput`, BDT cash bonuses/penalties) removed from CHRO consoles in favor of Commendation XP (+10, +25, +50, +100 XP) and KPI percentage points.
+- **Automated Idempotent Weekly Sweep (`/api/cron/sweep`):**
+  - Evaluates Asia/Dhaka calendar weeks (Monday 00:00 to Sunday 23:59:59.999 Dhaka time / UTC+6).
+  - Automatically flags zero-deliverable staff as `NA` (`INACTIVE`) and enqueues exactly one FIFO inactivity penalty (10% deduction on next deliverable upon return).
+  - Audits hash-chain integrity, runs balance drift reconciliation, and closes backfill windows.
+- **Public Company Leaderboard (`/leaderboard`):**
+  - Universal public read access granted across all employee tiers (`@RequireAnyPermission('leaderboards:read', 'tasks:read_own', ...)`).
+  - Data minimization strips sensitive financial data while normalizing unrecorded or inactive states cleanly to `0.00` and `0 XP`.
 
-### B. Role Authority Tiers & Server-Enforced Ceiling
+### B. Permission-View Synchronization & Access Control
+- **Strict Role-View Synchronization:**
+  - Scoped `access-control` strictly to CEO and root administrators (`roles:read`, `roles:create`, `system:root`).
+  - Non-root users (including CHRO) cannot access or trigger errors from the CEO Role Capability Matrix.
+  - CEO Role Creator MFA aligned with target equivalence (`'new'` and `'global'`) for smooth entity generation.
+- **Real Institutional Staff Roster (`@seu.edu.bd`):**
+  - 33 legacy dummy `@pointfex.internal` accounts suspended (`isSuspended: true`).
+  - Strict institutional domain filtering enforces that only real verified university staff accounts are loaded across directories, squads, and leaderboards.
+
+### C. Role Authority Tiers & Server-Enforced Ceiling
 - **Four Standard Tiers:** `CEO` (implicit for `system:root`), `EXECUTIVE` (C-level: CTO, CFO, CHRO, COO, CPO, CRO), `MANAGER` (PM, Squad Lead), and `STAFF` (Developers, Designers, Operations).
 - **Strict Tier Ceiling Law:** Implemented server-side in guards and domain services. An actor may only inspect access details or modify personnel in a **strictly lower tier** (`isStrictlyLowerTier`).
 - **Executive Restrictions:**
   - Executives cannot change or request changes for peers (`EXECUTIVE`), the `CEO`, or themselves (403 Forbidden).
   - Executives can only submit requests for `MANAGER` and `STAFF` users, routing directly to the CEO.
 
-### B. Fixed CEO & Zero-Trust Governance
-- **Immutable CEO Anchor:** Exactly one active holder of `system:root` matching `CEO_EMAIL`, verified at startup. The `system:root` user cannot be deleted, suspended, demoted, or edited via application endpoints.
+### D. Fixed CEO & Zero-Trust Governance
+- **Immutable CEO Anchor:** Exactly one active holder of `system:root` matching `CEO_EMAIL` (`noor@seu.edu.bd`), verified at startup. The `system:root` user cannot be deleted, suspended, demoted, or edited via application endpoints.
 - **CEO Transfer Disabled:** Governed by `CEO_TRANSFER_ENABLED=false` (default). In-app CEO transfer cards, modals, and succession endpoints return `404 Not Found`.
-- **CEO Direct Authority:** Actions taken by the CEO (role creation, permission edits, user assignments, suspensions, team updates) take effect **immediately**. No approval requests are spawned for the CEO. Mandatory: fresh 6-digit MFA, written reason (min 10 chars), audit log, and history entry.
+- **CEO Direct Authority:** Actions taken by the CEO (role creation, permission edits, user assignments, suspensions, team updates) take effect **immediately**. No approval requests are spawned for the CEO. Mandatory: fresh 6-digit MFA, audit log, and history entry.
 - **CEO Identity Update (`PATCH /api/employees/:id/identity`):** CEO can update any user's legal name and email. Requires fresh MFA; auto-adds email to allowlist, revokes active sessions, unlinks external Google accounts, and notifies both addresses.
 - **Offline Emergency Recovery:** Database-level CLI procedure `npm run ceo:reset-mfa` documented in [docs/security-runbook.md](docs/security-runbook.md).
 
-### C. Executive Voting Engine & Project Lifecycle
+### E. Executive Voting Engine & Project Lifecycle
 - **Voting Engine (`VoteEngineService`):**
   - Eligible voters = active holders of `votes:cast` excluding the requester.
   - Finalizes as `APPROVED` when strictly more than half of all eligible voters approve (`> Math.floor(N/2)`).
@@ -101,31 +130,12 @@ Engineered for strict organizational governance, server-enforced role tiers, exe
   - PM triage: Forward to Executive Vote (crediting developer), Return for revisions, or Decline.
   - **Confidential Grievance Mode:** Bypasses PM and squad entirely, routing confidentially to HR leadership.
 
-### D. Unified Inbox & Approval Hardening
-- **Shared `MfaConfirmModal`:** Standardized across button clicks and keyboard shortcuts (`a` approve, `r` reject). Auto-focuses 6-digit input, supports clipboard paste, auto-submits, and enforces written reason (min 10 characters).
-- **TOTP Tolerance:** Accepts ±1 step clock tolerance (±30s skew) with single-use replay protection and clear messages.
-- **Non-Stale State:** On approval/rejection, items animate out immediately from local state without full-page reload. Errors keep the modal open displaying attempts remaining.
-- **Bulk Action Safety:** Bulk actions allowed strictly for non-sensitive tasks. Sensitive items (access, budget, approvals, allowlist) require individual MFA codes.
-- **Approval Engine Admin Console:** Renamed and restricted to users with `approvals:manage` or `system:root`. Hidden from ordinary users.
-- **Self-Approval Blocked:** Blocked across all services with friendly notification.
-
-### E. Access History Ledger (`/access-history`)
-- Gated by `access_history:read` (CEO and Executives only).
-- Immutable, searchable timeline of grants, revocations, tier changes, delegations, and identity changes.
-- Live summary stats, filters by change type, pagination, and one-click JSON/CSV export.
-
-### F. Password Hardening & Session Security
-- **Strict Password Policy:** 8–128 characters, uppercase, lowercase, number, symbol, dictionary blacklist validation, no user name or email containment, no reuse of last 5 hashes (`PasswordHistory`).
-- **Live Strength Meter:** Real-time visual feedback checklist in My Account.
+### F. Unified Inbox, Session Security & Design System
+- **Shared `MfaConfirmModal`:** Standardized across button clicks and keyboard shortcuts (`a` approve, `r` reject). Auto-focuses 6-digit input, supports clipboard paste, auto-submits, and enforces written justification.
+- **TOTP Tolerance:** Accepts ±1 step clock tolerance (±30s skew) with single-use replay protection.
+- **30-Minute Idle Timeout:** Global activity monitor with 1-minute countdown warning modal.
 - **Cross-Tab Logout:** Connected `BroadcastChannel('pointfex-auth')` so logging out in one window instantly signs out all other open tabs.
-- **Log Out of All Devices:** New button in My Account revoking all active security sessions and refresh token families.
-- **30-Minute Idle Timeout:** Global activity monitor with 1-minute countdown warning modal. Any activity resets the timer.
-- **Permanent Google Link:** Removed unlink endpoint. Displays read-only green badge *"Google Account Linked"*.
-
-### G. Production Vercel Deployment & Sweeper
-- **Frontend Vercel Config:** Removed permanent 301/308 redirects on `/`. Single-page-app rewrite to `/index.html`. Security headers and immutable asset caching.
-- **Backend Vercel Config:** Bundles Prisma Client via `@vercel/node`.
-- **Automated Sweeper (`/api/cron/sweep`):** Runs every 5 minutes via Vercel Cron. Cancels expired votes, revokes expired delegations, unfreezes accounts, clears expired sessions, and validates audit hash chain integrity.
+- **Modern Design System Tokens:** 100% token-based colors (light & dark mode), unified component library (`DataTable`, `Modal`, `Tabs`, `StatCard`, `EmptyState`, `ErrorState`), global error boundaries, and mobile responsiveness.
 
 ---
 
@@ -138,11 +148,13 @@ Engineered for strict organizational governance, server-enforced role tiers, exe
 | **Inspect Access Details** | Anyone | Lower Tiers (Read-Only) | Assigned Squad Devs (Read-Only) | Self Only |
 | **Access History Ledger** | Full Read & Export | Full Read & Export | ❌ Hidden (403) | ❌ Hidden (403) |
 | **Role Assignment / Revoke** | Direct (Immediate) | Request-Only (for Lower Tiers) | ❌ None | ❌ None |
+| **Role Capability Matrix** | Full Management | ❌ None | ❌ None | ❌ None |
 | **Delegation Controls** | See All & Revoke Any | Delegate Held & Revoke Own | Receive Only | Receive Only |
 | **Edit Name & Work Email** | Direct (MFA + Audit) | ❌ None | ❌ None | ❌ None |
 | **Teams & Squads** | Manage Mode | Manage Mode | Read-Only (Assigned Squad) | Read-Only (Assigned Squad) |
 | **Project Creation** | Direct / Stepper | Stepper & Cast Vote | Request-Only | Submit Proposals |
 | **Executive Voting Engine** | Override (Approve/Reject)| Cast Vote (`votes:cast`) | ❌ None | ❌ None |
+| **Company Leaderboard** | Public Read (`0.00`/XP) | Public Read (`0.00`/XP) | Public Read (`0.00`/XP) | Public Read (`0.00`/XP) |
 
 ---
 
@@ -167,7 +179,7 @@ COOKIE_SECURE="true"
 COOKIE_SAME_SITE="strict"
 
 # --- Governance & Security Invariants ---
-CEO_EMAIL="ceo@pointfex.com"
+CEO_EMAIL="noor@seu.edu.bd"
 CEO_TRANSFER_ENABLED="false"
 CRON_SECRET="<generate-random-32-character-secret>"
 VOTE_DEADLINE_DAYS="7"
@@ -208,32 +220,29 @@ https://backend-erp-pointfex.vercel.app/api/auth/google/callback
 ### C. Verification Test Suite
 Run comprehensive verification across both packages:
 ```bash
-# Backend unit, integration, and governance test suites (22 suites, 112 passed)
+# Backend unit, integration, and governance test suites (30 suites, 615 passed)
 npm --prefix backend test -- --runInBand
 
-# Backend build
+# Backend production build (0 errors)
 npm --prefix backend run build
 
-# Frontend typecheck & test suite (18 passed)
-npm --prefix frontend run typecheck
-npm --prefix frontend test -- --watchAll=false
-
-# Frontend lint & production build
-npm --prefix frontend run lint
-npm --prefix frontend run build
+# Frontend verification (typecheck, lint, 27 tests, and Vite build)
+npm --prefix frontend run verify
 ```
 
 ---
 
 ## 6. Complete Documentation Catalog
 
-- [LOCAL_SETUP.md](LOCAL_SETUP.md) — Local development and Docker test container guide
-- [docs/vercel-deployment.md](docs/vercel-deployment.md) — Detailed Vercel deployment, Cron sweep, and OAuth guide
-- [docs/security-runbook.md](docs/security-runbook.md) — Key rotation, emergency CEO MFA reset CLI, and incident response
-- [docs/permissions_master.md](docs/permissions_master.md) — Complete 608+ permission catalog, packs, and rules
-- [docs/authorization.md](docs/authorization.md) — PBAC/DAC, scopes, delegations, and maker-checker SoD
+- [docs/README.md](docs/README.md) — Master Documentation Portal & Architecture Index
+- [docs/KPI_XP_SYSTEM_MANUAL.md](docs/KPI_XP_SYSTEM_MANUAL.md) — Master KPI & XP Engine Manual (Formulas, Sweeps, Consensus)
+- [docs/kpi-xp/](docs/kpi-xp/) — Core Engine Specs: ADR-001 (Ledger), Architecture, SRS, Parity Analysis & Migration Notes
+- [docs/authorization.md](docs/authorization.md) — PBAC Architecture, Dynamic Roles, MFA Guards, and Delegations
+- [docs/permissions_master.md](docs/permissions_master.md) — Complete 606+ granular permission catalog across 21 modules
 - [docs/api.md](docs/api.md) — Backend REST API endpoints and payload reference
-- [docs/known-issues.md](docs/known-issues.md) — Deferred enhancements and known non-blocking items
+- [docs/security-runbook.md](docs/security-runbook.md) — Key rotation, emergency CEO MFA reset CLI, and incident response
+- [docs/vercel-deployment.md](docs/vercel-deployment.md) — Detailed Vercel deployment, Cron sweep, and OAuth guide
+- [docs/archive/](docs/archive/) — Historical phase audits, legacy discovery reports, and migration notes
 
 ---
 
