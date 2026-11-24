@@ -64,7 +64,6 @@ jobs:
             exit 1
           fi
       - name: Deploy Frontend to Vercel
-        working-directory: frontend
         run: |
           scope_args=()
           if [ -n "$VERCEL_SCOPE" ]; then
@@ -75,7 +74,6 @@ jobs:
           vercel build --prod "${scope_args[@]}" --token="$VERCEL_TOKEN"
           vercel deploy --prebuilt --prod "${scope_args[@]}" --token="$VERCEL_TOKEN"
       - name: Deploy Backend to Vercel
-        working-directory: backend
         run: |
           scope_args=()
           if [ -n "$VERCEL_SCOPE" ]; then
