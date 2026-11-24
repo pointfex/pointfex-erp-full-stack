@@ -463,7 +463,7 @@ export function PmTaskManagementPage() {
         </div>
 
         {/* Right Side (9 cols): Kanban Board */}
-        <div className="lg:col-span-9 space-y-4">
+        <div className="lg:col-span-9 min-w-0 space-y-4">
           {/* Search & Dev filter */}
           <div className="p-3 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div className="relative w-full sm:w-64">
@@ -545,7 +545,7 @@ export function PmTaskManagementPage() {
                               draggable
                               onDragStart={(e) => handleDragStart(e, task.id)}
                               onClick={() => setSelectedTaskModal(task)}
-                              className={`p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/70 dark:border-slate-750 shadow-2xs hover:shadow-xs transition-all cursor-pointer group space-y-2.5 ${
+                              className={`p-3 rounded-xl bg-surface border border-border shadow-2xs hover:shadow-xs transition-all cursor-pointer group space-y-2.5 ${
                                 isDragging ? 'opacity-40 scale-95' : ''
                               }`}
                             >
@@ -627,13 +627,13 @@ export function PmTaskManagementPage() {
                               {/* Todo quick action */}
                               {col.id === 'todo' && (
                                 <div
-                                  className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800"
+                                  className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <button
                                     type="button"
                                     onClick={() => updateTaskStatus(task.id, 'in_progress')}
-                                    className="flex-1 py-1 px-2 rounded-lg bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 text-sky-600 dark:text-sky-400 border border-sky-200/60 dark:border-sky-900/40 text-[10px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                    className="flex-1 py-1 px-2 rounded-lg bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-950/60 text-sky-600 dark:text-sky-400 border border-sky-200/60 dark:border-sky-900/40 text-[10px] font-semibold whitespace-nowrap flex items-center justify-center gap-1 cursor-pointer transition-colors"
                                   >
                                     Start Work
                                   </button>
@@ -644,7 +644,7 @@ export function PmTaskManagementPage() {
                                       setPmScore(85)
                                       setPmScoreFeedback('')
                                     }}
-                                    className="py-1 px-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    className="py-1 px-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-semibold whitespace-nowrap flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-2xs"
                                   >
                                     <CheckCircle2 className="w-3 h-3" />
                                     Complete &amp; Score
@@ -655,13 +655,13 @@ export function PmTaskManagementPage() {
                               {/* In-Progress quick action */}
                               {col.id === 'in_progress' && (
                                 <div
-                                  className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800"
+                                  className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <button
                                     type="button"
                                     onClick={() => updateTaskStatus(task.id, 'in_review')}
-                                    className="flex-1 py-1 px-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 text-purple-600 dark:text-purple-400 border border-purple-200/60 dark:border-purple-900/40 text-[10px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                    className="flex-1 py-1 px-2 rounded-lg bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-950/60 text-purple-600 dark:text-purple-400 border border-purple-200/60 dark:border-purple-900/40 text-[10px] font-semibold whitespace-nowrap flex items-center justify-center gap-1 cursor-pointer transition-colors"
                                   >
                                     Ready for Review
                                   </button>
@@ -672,7 +672,7 @@ export function PmTaskManagementPage() {
                                       setPmScore(85)
                                       setPmScoreFeedback('')
                                     }}
-                                    className="py-1 px-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    className="py-1 px-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-semibold whitespace-nowrap flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-2xs"
                                   >
                                     <CheckCircle2 className="w-3 h-3" />
                                     Complete &amp; Score
@@ -682,7 +682,7 @@ export function PmTaskManagementPage() {
 
                               {/* Completed Badge & Score info */}
                               {col.id === 'completed' && (
-                                <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-[10px]">
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800 text-[10px]">
                                   <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
                                     <CheckCircle2 className="w-3 h-3" />
                                     Completed
@@ -701,7 +701,7 @@ export function PmTaskManagementPage() {
                                         setPmScore(Number((task as any).pmScore || (task as any).score) || 85)
                                         setPmScoreFeedback('')
                                       }}
-                                      className="py-0.5 px-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-900/40 text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                      className="py-0.5 px-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200/60 dark:border-indigo-900/40 text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                                     >
                                       <Award className="w-3 h-3" />
                                       <span>{Boolean((task as any).pmScore || (task as any).score) ? 'Edit KPI' : 'Assign KPI'}</span>
@@ -713,7 +713,7 @@ export function PmTaskManagementPage() {
                               {/* In-Review PM Action Buttons */}
                               {col.id === 'in_review' && (
                                 <div
-                                  className="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800"
+                                  className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <button
@@ -734,7 +734,7 @@ export function PmTaskManagementPage() {
                                       setRejectingTask(task)
                                       setRejectFeedback('')
                                     }}
-                                    className="flex-1 py-1.5 px-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40 text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
+                                    className="flex-1 py-1.5 px-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200/60 dark:border-rose-900/40 text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors whitespace-nowrap shadow-2xs"
                                   >
                                     <XCircle className="w-3.5 h-3.5 shrink-0" />
                                     <span>Reject</span>
