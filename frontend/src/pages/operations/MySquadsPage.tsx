@@ -846,7 +846,7 @@ export function MySquadsPage() {
             </div>
 
             {/* Scoped Deliverables Kanban Board */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="lg:col-span-2 min-w-0 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -924,7 +924,7 @@ export function MySquadsPage() {
                                   draggable={isDraggable}
                                   onDragStart={(e) => handleDragStart(e, task)}
                                   onClick={() => setSelectedTaskModal(task)}
-                                  className={`p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/80 dark:border-slate-750 shadow-2xs hover:shadow-xs transition-all space-y-2 select-none ${
+                                  className={`p-3 rounded-xl bg-surface border border-border shadow-2xs hover:shadow-xs transition-all space-y-2 select-none ${
                                     isDraggable
                                       ? 'cursor-grab active:cursor-grabbing hover:border-indigo-300 dark:hover:border-indigo-600'
                                       : 'cursor-pointer hover:border-slate-300'
