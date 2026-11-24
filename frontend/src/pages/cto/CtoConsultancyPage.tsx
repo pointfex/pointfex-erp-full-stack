@@ -488,7 +488,7 @@ export function CtoConsultancyPage() {
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
             activeTab === 'consultations'
               ? 'bg-indigo-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100/70 dark:bg-slate-850'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100/70 dark:bg-surface-muted'
           }`}
         >
           <MessageSquare className="w-4 h-4" />
@@ -505,7 +505,7 @@ export function CtoConsultancyPage() {
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
             activeTab === 'executive_notes'
               ? 'bg-indigo-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100/70 dark:bg-slate-850'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100/70 dark:bg-surface-muted'
           }`}
         >
           <BookOpen className="w-4 h-4" />
@@ -522,7 +522,7 @@ export function CtoConsultancyPage() {
       {activeTab === 'consultations' && (
         <div className="space-y-4">
           {/* Controls Bar: Sub-filters & Search */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-850/80 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-surface-muted/80 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800">
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
               <button
                 onClick={() => setConsultationFilter('all')}
@@ -673,7 +673,7 @@ export function CtoConsultancyPage() {
                         {item.reason}
                       </p>
                       {item.specificQuestions && (
-                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-850/60 border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-1">
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-surface-muted/60 border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-1">
                           <span className="font-semibold text-slate-700 dark:text-slate-300 block text-[11px]">
                             Specific Discussion Questions:
                           </span>
@@ -768,7 +768,7 @@ export function CtoConsultancyPage() {
           </div>
 
           {/* Controls: Category Filter & Search */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-850/80 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 dark:bg-surface-muted/80 p-3 rounded-2xl border border-slate-200/70 dark:border-slate-800">
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
               <button
                 onClick={() => setNoteCategoryFilter('all')}
@@ -886,7 +886,7 @@ export function CtoConsultancyPage() {
                     <h4 className="text-base font-bold text-slate-900 dark:text-white font-display">
                       {note.title}
                     </h4>
-                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-850/80 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 italic">
+                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-surface-muted/80 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 italic">
                       &ldquo;{note.executiveSummary}&rdquo;
                     </p>
                   </div>
@@ -1094,7 +1094,7 @@ export function CtoConsultancyPage() {
             </div>
 
             {/* Request Summary for Reference */}
-            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-850/80 border border-slate-100 dark:border-slate-800 space-y-1 text-xs">
+            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-surface-muted/80 border border-slate-100 dark:border-slate-800 space-y-1 text-xs">
               <div className="font-bold text-slate-900 dark:text-white font-display">
                 {showAdviceModal.topic}
               </div>
