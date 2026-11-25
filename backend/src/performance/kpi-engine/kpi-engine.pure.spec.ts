@@ -165,11 +165,26 @@ describe('Pure KPI & XP Engine (Deterministic Mathematical Architecture)', () =>
         cpo: { score: 85, status: 'ADJUSTED' },
         cfo: { score: 80, status: 'CONFIRMED' },
         chro: { score: 90, status: 'CONFIRMED' },
+        weights: { pm: 0.50, cto: 0.15, cpo: 0.15, cfo: 0.10, chro: 0.10 },
       })
 
       // 0.50*90 (45) + 0.15*95 (14.25) + 0.15*85 (12.75) + 0.10*80 (8) + 0.10*90 (9) = 89.0
       expect(res.baseScore).toBe(89.0)
       expect(res.finalScore).toBe(89.0)
+      expect(res.isProvisional).toBe(false)
+    })
+
+    it('calculates canonical CHRO v4.2 weights (40% PM, 15% each CTO, CPO, CFO, CHRO)', () => {
+      const res = taskScoreDeveloper({
+        pm: { score: 90 },
+        cto: { score: 95, status: 'CONFIRMED' },
+        cpo: { score: 85, status: 'CONFIRMED' },
+        cfo: { score: 80, status: 'CONFIRMED' },
+        chro: { score: 90, status: 'CONFIRMED' },
+      })
+      // 0.40*90 (36) + 0.15*95 (14.25) + 0.15*85 (12.75) + 0.15*80 (12) + 0.15*90 (13.5) = 88.5
+      expect(res.baseScore).toBe(88.5)
+      expect(res.finalScore).toBe(88.5)
       expect(res.isProvisional).toBe(false)
     })
 
@@ -864,6 +879,7 @@ describe('Pure KPI & XP Engine (Deterministic Mathematical Architecture)', () =>
         cpo: { score: 85, status: 'ADJUSTED' },
         cfo: { score: 80, status: 'CONFIRMED' },
         chro: { score: 90, status: 'CONFIRMED' },
+        weights: { pm: 0.50, cto: 0.15, cpo: 0.15, cfo: 0.10, chro: 0.10 },
       })
       expect(t1.finalScore).toBe(89.0)
 

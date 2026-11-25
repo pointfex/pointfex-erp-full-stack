@@ -233,12 +233,12 @@ export function PmTaskManagementPage() {
       newTaskWeightCategory === 'SMALL'
         ? 1
         : newTaskWeightCategory === 'MEDIUM'
-          ? 2
+          ? 3
           : newTaskWeightCategory === 'LARGE'
-            ? 3
+            ? 5
             : newTaskWeightCategory === 'CRITICAL'
-              ? 5
-              : Number(newTaskCustomPoints) || 1
+              ? 7
+              : Number(newTaskCustomPoints) || 3
 
     try {
       await createTask({
@@ -850,10 +850,11 @@ export function PmTaskManagementPage() {
                   }}
                   className="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white cursor-pointer"
                 >
-                  <option value="SMALL">10 XP (1 Point · Minor)</option>
-                  <option value="LARGE">30 XP (3 Points · Standard)</option>
-                  <option value="CRITICAL">50 XP (5 Points · Complex)</option>
-                  <option value="CUSTOM">100 XP / Custom (Set manually)</option>
+                  <option value="SMALL">SMALL (1 pt / 10 XP · Minor)</option>
+                  <option value="MEDIUM">MEDIUM (3 pts / 30 XP · Standard)</option>
+                  <option value="LARGE">LARGE (5 pts / 50 XP · Complex)</option>
+                  <option value="CRITICAL">CRITICAL (7 pts / 70 XP · Core/Urgent)</option>
+                  <option value="CUSTOM">CUSTOM (10x approved weight · Manual)</option>
                 </select>
               </div>
 

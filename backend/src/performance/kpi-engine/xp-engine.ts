@@ -7,10 +7,44 @@ import {
 } from './types'
 
 /**
+ * Standard task weight point schedule per CHRO Requirements §1.
+ * Small: 1, Medium: 3, Large: 5, Critical: 7
+ */
+export const STANDARD_TASK_WEIGHTS: Record<Exclude<TaskWeightCategoryType, 'CUSTOM'>, number> = {
+  SMALL: 1,
+  MEDIUM: 3,
+  LARGE: 5,
+  CRITICAL: 7,
+}
+
+/**
+ * Standard task XP schedule per CHRO Requirements §1 (10 × approved weight).
+ * Small: 10, Medium: 30, Large: 50, Critical: 70
+ */
+export const STANDARD_TASK_XP: Record<Exclude<TaskWeightCategoryType, 'CUSTOM'>, number> = {
+  SMALL: 10,
+  MEDIUM: 30,
+  LARGE: 50,
+  CRITICAL: 70,
+}
+
+/**
+ * Calculates XP adjustment for an already rewarded task when approved weight changes (§3.3).
+ * XP adjustment = 10 × (new approved weight − previous approved weight).
+ * Returns the signed difference as a separate audit transaction.
+ */
+export function calculateXpAdjustment(newApprovedWeight: number, previousApprovedWeight: number): number {
+  if (!Number.isFinite(newApprovedWeight) || !Number.isFinite(previousApprovedWeight)) {
+    throw new Error(`Invalid weights for adjustment: new=${newApprovedWeight}, prev=${previousApprovedWeight}`)
+  }
+  return round2(10 * (newApprovedWeight - previousApprovedWeight))
+}
+
+/**
  * Derives pure XP yield from verified task weight points.
  *
  * Rules:
- * 1. XP Yield = verifiedWeightPoints * 10, exactly.
+ * 1. XP Yield = verifiedWeightPoints * 10, exactly (§1).
  * 2. XP NEVER depends on PM satisfaction score or squad context multipliers.
  * 3. Status is PENDING if weightStatus !== 'VERIFIED'.
  * 4. Status is FROZEN if xp >= threshold (default 200).

@@ -27,7 +27,7 @@ import {
 } from './dto/task.dto'
 import { Prisma } from '@prisma/client'
 import { AuthenticatedUser } from '../common/auth-user.interface'
-import { xpForTask, taskScoreDeveloper, decideBackfill, weeklyKpiDeveloper } from '../performance/kpi-engine'
+import { xpForTask, taskScoreDeveloper, decideBackfill, weeklyKpiDeveloper, round2 } from '../performance/kpi-engine'
 import { getDhakaWeekBoundaries } from '../common/dhaka-time.util'
 
 @Injectable()
@@ -371,8 +371,10 @@ export class TasksService {
       userRoles.some((r) =>
         ['ceo', 'chro', 'cto', 'cfo', 'cpo', 'system:root', 'admin', 'executive', 'c-level'].includes(r),
       ) ||
-      (actor.permissions || []).includes('directives:dispatch') ||
-      (actor.permissions || []).includes('projects:read_all')
+      (actor.permissions || []).includes('directives:dispatch')
+
+    const isChroOrCeo =
+      userRoles.some((r) => ['ceo', 'chro', 'system:root'].includes(r)) || actor.id === 'emp_ceo_01'
 
     let origin: 'MAIN_SQUAD' | 'OUTSIDE_SQUAD' | 'ISOLATED_EXECUTIVE' = 'MAIN_SQUAD'
 
@@ -383,15 +385,16 @@ export class TasksService {
       origin = isMain ? 'MAIN_SQUAD' : 'OUTSIDE_SQUAD'
     }
 
-    // Determine Weight & Category
+    // Determine Weight & Category per CHRO Requirements §1:
+    // Small: 1 (10 XP), Medium: 3 (30 XP), Large: 5 (50 XP), Critical: 7 (70 XP), Custom: CHRO-approved
     const weightCategory: any = dto.weightCategory || 'MEDIUM'
     let proposedWeight =
       dto.proposedWeight ||
       (dto as any).weightPoints ||
       (dto as any).weight ||
-      (({ SMALL: 1, MEDIUM: 2, LARGE: 3, CRITICAL: 5 } as const)[
+      (({ SMALL: 1, MEDIUM: 3, LARGE: 5, CRITICAL: 7 } as const)[
         weightCategory as 'SMALL' | 'MEDIUM' | 'LARGE' | 'CRITICAL'
-      ] ?? 2)
+      ] ?? 3)
 
     if (weightCategory === 'CUSTOM') {
       const customVal = dto.proposedWeight || (dto as any).weightPoints || (dto as any).weight
@@ -475,18 +478,19 @@ export class TasksService {
         },
       })
 
-      // Record in taskWeightVerification
+      // Record in taskWeightVerification per CHRO Requirements §3.1:
+      // When PM assigns task, proposed weight remains pending until verified by CHRO.
       if (tx.taskWeightVerification && typeof tx.taskWeightVerification.create === 'function') {
         await tx.taskWeightVerification.create({
           data: {
             taskId,
             proposedWeight: new Prisma.Decimal(proposedWeight),
-            approvedWeight: isExecutive ? new Prisma.Decimal(proposedWeight) : null,
+            approvedWeight: isChroOrCeo ? new Prisma.Decimal(proposedWeight) : null,
             category: weightCategory,
             context: origin === 'ISOLATED_EXECUTIVE' ? 'DIRECT_EXECUTIVE' : origin,
-            status: isExecutive ? 'APPROVED' : 'PENDING_CHRO',
+            status: isChroOrCeo ? 'APPROVED' : 'PENDING_CHRO',
             proposerId: actor.id,
-            chroId: isExecutive ? actor.id : null,
+            chroId: isChroOrCeo ? actor.id : null,
             isMassiveXp: proposedWeight >= 20,
             massiveXpFrozen: proposedWeight >= 20,
           },
@@ -545,7 +549,7 @@ export class TasksService {
           const weeklyKpi = weeklyKpiDeveloper({
             tasks: weekTasks.map((t) => ({
               score: Number(t.pmScore || initialScore),
-              weightPoints: Number(t.weightPoints || 2),
+              weightPoints: Number(t.weightPoints || 3),
               context: (t.origin || 'MAIN_SQUAD') as any,
             })),
           })
@@ -782,7 +786,7 @@ export class TasksService {
         throw new BadRequestException('CUSTOM weight category requires points > 0')
       }
     } else if (!points) {
-      points = ({ SMALL: 1, MEDIUM: 2, LARGE: 3, CRITICAL: 5 } as const)[dto.weightCategory as 'SMALL' | 'MEDIUM' | 'LARGE' | 'CRITICAL'] ?? 2
+      points = ({ SMALL: 1, MEDIUM: 3, LARGE: 5, CRITICAL: 7 } as const)[dto.weightCategory as 'SMALL' | 'MEDIUM' | 'LARGE' | 'CRITICAL'] ?? 3
     }
 
     const actorRole = (actor.role || '').toLowerCase()
@@ -833,13 +837,20 @@ export class TasksService {
 
     let newStatus: any = 'VERIFIED'
     let newCategory = task.weightCategory
-    let newPoints = Number(task.weightPoints || 2)
+    let newPoints = Number(task.weightPoints || 3)
 
     if (dto.action === 'REJECT') {
       newStatus = 'REJECTED'
     } else if (dto.action === 'MODIFY') {
       newCategory = (dto.approvedCategory || task.weightCategory) as any
-      newPoints = dto.approvedPoints !== undefined ? Number(dto.approvedPoints) : newPoints
+      if (dto.approvedPoints !== undefined) {
+        newPoints = Number(dto.approvedPoints)
+      } else if (dto.approvedCategory) {
+        newPoints =
+          ({ SMALL: 1, MEDIUM: 3, LARGE: 5, CRITICAL: 7 } as const)[
+            dto.approvedCategory as 'SMALL' | 'MEDIUM' | 'LARGE' | 'CRITICAL'
+          ] ?? newPoints
+      }
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -869,7 +880,8 @@ export class TasksService {
         })
       }
 
-      // If XP events already exist for this task, emit REVERSAL and new AWARD event
+      // XP ledger handling per §3.2 & §3.3:
+      // XP derived strictly from approved weight. For already rewarded task, post signed delta difference.
       if (this.xpLedger) {
         const existingEntries = await tx.xpLedgerEntry.findMany({
           where: { taskId, employeeId: task.assigneeId },
@@ -877,41 +889,17 @@ export class TasksService {
         })
 
         if (existingEntries.length > 0) {
-          for (const e of existingEntries) {
-            if (e.eventType !== 'REVERSAL') {
-              await this.xpLedger.appendEvent(
-                {
-                  employeeId: task.assigneeId,
-                  delta: e.delta,
-                  eventType: 'REVERSAL',
-                  reason: `Reversal of XP event ${e.id} due to CHRO weight verification update on task ${taskId}`,
-                  taskId,
-                  reversesEntryId: e.id,
-                  awardedById: actor.id,
-                },
-                tx,
-              )
-            }
-          }
+          const priorNetXp = existingEntries.reduce((sum, e) => sum + e.delta, 0)
+          const targetXp = newStatus === 'VERIFIED' ? round2(newPoints * 10) : 0
+          const diff = round2(targetXp - priorNetXp)
 
-          if (newStatus === 'VERIFIED') {
-            const kpiConfig = tx.kpiConfig && typeof tx.kpiConfig.findUnique === 'function'
-              ? await tx.kpiConfig.findUnique({ where: { id: 'singleton' } })
-              : null
-            const threshold = kpiConfig?.massiveXpThreshold || 200
-            const pureXp = xpForTask({
-              weightPoints: newPoints,
-              weightStatus: 'VERIFIED',
-              isFrozenThresholdXp: threshold,
-            })
-
-            const eventType: any = pureXp.state === 'FROZEN' ? 'FREEZE' : 'VERIFY_RELEASE'
+          if (diff !== 0) {
             await this.xpLedger.appendEvent(
               {
                 employeeId: task.assigneeId,
-                delta: pureXp.xp,
-                eventType,
-                reason: `CHRO verified weight ${newPoints} pts -> ${pureXp.xp} XP on task ${taskId}`,
+                delta: diff,
+                eventType: 'ADJUSTMENT',
+                reason: `XP adjustment = 10 × (${newPoints} - ${task.weightPoints}) on task ${taskId} (verified by ${actorRole.toUpperCase()})`,
                 taskId,
                 taskCategory: newCategory,
                 awardedById: actor.id,
@@ -919,6 +907,30 @@ export class TasksService {
               tx,
             )
           }
+        } else if (task.status === 'completed' && newStatus === 'VERIFIED') {
+          const kpiConfig = tx.kpiConfig && typeof tx.kpiConfig.findUnique === 'function'
+            ? await tx.kpiConfig.findUnique({ where: { id: 'singleton' } })
+            : null
+          const threshold = kpiConfig?.massiveXpThreshold || 200
+          const pureXp = xpForTask({
+            weightPoints: newPoints,
+            weightStatus: 'VERIFIED',
+            isFrozenThresholdXp: threshold,
+          })
+
+          const eventType: any = pureXp.state === 'FROZEN' ? 'FREEZE' : 'VERIFY_RELEASE'
+          await this.xpLedger.appendEvent(
+            {
+              employeeId: task.assigneeId,
+              delta: pureXp.xp,
+              eventType,
+              reason: `CHRO verified weight ${newPoints} pts -> ${pureXp.xp} XP on task ${taskId}`,
+              taskId,
+              taskCategory: newCategory,
+              awardedById: actor.id,
+            },
+            tx,
+          )
         }
       }
 
@@ -1036,7 +1048,7 @@ export class TasksService {
 
           return {
             score: scoreResult.finalScore,
-            weightPoints: Number(t.weightPoints || 2),
+            weightPoints: Number(t.weightPoints || 3),
             context: (t.origin || 'MAIN_SQUAD') as any,
           }
         })
@@ -1045,7 +1057,7 @@ export class TasksService {
           tasks:
             developerTasksInput.length > 0
               ? developerTasksInput
-              : [{ score, weightPoints: Number(task.weightPoints || 2), context: 'MAIN_SQUAD' }],
+              : [{ score, weightPoints: Number(task.weightPoints || 3), context: 'MAIN_SQUAD' }],
         })
 
         const finalKpiScore = weeklyKpi.value !== null ? weeklyKpi.value : score
@@ -1120,7 +1132,7 @@ export class TasksService {
         }
 
         // Append XP Ledger Event
-        const weightPoints = Number(task.weightPoints || 2)
+        const weightPoints = Number(task.weightPoints || 3)
         const weightStatus = task.weightStatus || 'VERIFIED'
         const xpResult = xpForTask({
           weightPoints,
@@ -1185,11 +1197,11 @@ export class TasksService {
       throw new ForbiddenException('Only CHRO (plus CEO supreme override) can approve or modify task weights.')
     }
 
-    let newPoints = weightPoints !== undefined ? Number(weightPoints) : Number(task.weightPoints || 2)
+    let newPoints = weightPoints !== undefined ? Number(weightPoints) : Number(task.weightPoints || 3)
 
     if (weightCategory && weightPoints === undefined) {
       newPoints =
-        ({ SMALL: 1, MEDIUM: 2, LARGE: 3, CRITICAL: 5 } as const)[weightCategory as 'SMALL' | 'MEDIUM' | 'LARGE' | 'CRITICAL'] ?? newPoints
+        ({ SMALL: 1, MEDIUM: 3, LARGE: 5, CRITICAL: 7 } as const)[weightCategory as 'SMALL' | 'MEDIUM' | 'LARGE' | 'CRITICAL'] ?? newPoints
     }
 
     if (isNaN(newPoints) || newPoints <= 0) {
@@ -1199,9 +1211,9 @@ export class TasksService {
     let newCategory: any = weightCategory || 'CUSTOM'
     if (newCategory !== 'CUSTOM') {
       if (newPoints === 1) newCategory = 'SMALL'
-      else if (newPoints === 2) newCategory = 'MEDIUM'
-      else if (newPoints === 3) newCategory = 'LARGE'
-      else if (newPoints === 5) newCategory = 'CRITICAL'
+      else if (newPoints === 3) newCategory = 'MEDIUM'
+      else if (newPoints === 5) newCategory = 'LARGE'
+      else if (newPoints === 7) newCategory = 'CRITICAL'
       else newCategory = 'CUSTOM'
     }
 
@@ -1264,7 +1276,7 @@ export class TasksService {
             cfo: cfo ? { score: Number(cfo.score), status: cfo.status } : undefined,
             chro: chro ? { score: Number(chro.score), status: chro.status } : undefined,
           })
-          const pts = t.id === taskId ? newPoints : Number(t.weightPoints || 2)
+          const pts = t.id === taskId ? newPoints : Number(t.weightPoints || 3)
           return {
             score: scoreResult.finalScore,
             weightPoints: pts,
@@ -1313,22 +1325,43 @@ export class TasksService {
 
         // XP ledger adjustment
         if (this.xpLedger) {
-          const pureXp = xpForTask({
-            weightPoints: newPoints,
-            weightStatus: 'VERIFIED',
+          const existingEntries = await tx.xpLedgerEntry.findMany({
+            where: { taskId, employeeId: task.assigneeId },
+            orderBy: { sequence: 'asc' },
           })
-          await this.xpLedger.appendEvent(
-            {
-              employeeId: task.assigneeId,
-              delta: pureXp.xp,
-              eventType: 'VERIFY_RELEASE',
-              reason: `CHRO updated weight to ${newPoints} pts (${pureXp.xp} XP) on task ${taskId}`,
-              taskId,
-              taskCategory: newCategory,
-              awardedById: actor?.id,
-            },
-            tx,
-          )
+
+          const targetXp = round2(newPoints * 10)
+          if (existingEntries.length > 0) {
+            const priorNetXp = existingEntries.reduce((sum, e) => sum + e.delta, 0)
+            const diff = round2(targetXp - priorNetXp)
+            if (diff !== 0) {
+              await this.xpLedger.appendEvent(
+                {
+                  employeeId: task.assigneeId,
+                  delta: diff,
+                  eventType: 'ADJUSTMENT',
+                  reason: `CHRO updated weight to ${newPoints} pts (XP diff: ${diff > 0 ? '+' : ''}${diff}) on task ${taskId}`,
+                  taskId,
+                  taskCategory: newCategory,
+                  awardedById: actor?.id,
+                },
+                tx,
+              )
+            }
+          } else {
+            await this.xpLedger.appendEvent(
+              {
+                employeeId: task.assigneeId,
+                delta: targetXp,
+                eventType: 'VERIFY_RELEASE',
+                reason: `CHRO verified task weight at ${newPoints} pts (${targetXp} XP) on task ${taskId}`,
+                taskId,
+                taskCategory: newCategory,
+                awardedById: actor?.id,
+              },
+              tx,
+            )
+          }
         }
       }
 
@@ -1575,30 +1608,13 @@ export class TasksService {
 
       const isAssigneePm = isProjectManager(task.assignee)
 
-      // 5. Inactivity return penalty consumption (FIFO, exactly one)
-      let penaltyApplied = false
-      if (!isAssigneePm && tx.inactivityPenalty && typeof tx.inactivityPenalty.findFirst === 'function') {
-        const oldestPenalty = await tx.inactivityPenalty.findFirst({
-          where: { userId: task.assigneeId, consumed: false },
-          orderBy: { weekStart: 'asc' },
-        })
-        if (oldestPenalty && typeof tx.inactivityPenalty.update === 'function') {
-          penaltyApplied = true
-          await tx.inactivityPenalty.update({
-            where: { id: oldestPenalty.id },
-            data: { consumed: true, appliedToTaskId: id },
-          })
-        }
-      }
-
-      // 6. Developer task score via pure engine
+      // 5. Per CHRO_Requirements.pdf §2.4: Inactivity penalty does not carry forward or deduct from task score
       const taskScoreResult = taskScoreDeveloper({
         pm: { score: pmScore },
-        penaltyToApply: penaltyApplied ? { penaltyRate: 0.10 } : undefined,
       })
 
-      // 7. Derive XP via pure engine (strictly verifiedWeightPoints * 10, no context discount)
-      const weightPoints = Number(task.weightPoints || 2)
+      // 6. Derive XP via pure engine (strictly verifiedWeightPoints * 10, no context discount)
+      const weightPoints = Number(task.weightPoints || 3)
       const weightStatus = isActorCeo ? 'VERIFIED' : (task.weightStatus || 'PENDING_CHRO_VERIFICATION')
       const kpiConfig = tx.kpiConfig && typeof tx.kpiConfig.findUnique === 'function'
         ? await tx.kpiConfig.findUnique({ where: { id: 'singleton' } })
@@ -1913,7 +1929,7 @@ export class TasksService {
     }
 
     const newScore = dto.score !== undefined ? Number(dto.score) : (task.pmScore ? Number(task.pmScore) : 85)
-    const newWeight = dto.weightPoints !== undefined ? Number(dto.weightPoints) : Number(task.weightPoints || 2)
+    const newWeight = dto.weightPoints !== undefined ? Number(dto.weightPoints) : Number(task.weightPoints || 3)
     const finalize = Boolean(dto.finalizeNow || isActorCeo)
 
     return this.prisma.$transaction(async (tx) => {

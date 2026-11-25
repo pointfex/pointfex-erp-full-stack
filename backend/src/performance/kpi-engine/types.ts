@@ -34,7 +34,7 @@ export interface DeveloperTaskScoringInput {
     chro?: number
   }
   penaltyToApply?: {
-    penaltyRate: number // e.g. 0.10 for 10% reduction
+    penaltyRate: number // deprecated per CHRO Requirements §2.1/§2.4
   }
 }
 
@@ -55,7 +55,7 @@ export interface DeveloperTaskScoringResult {
 export interface DeveloperCompletedTaskInput {
   score: number
   weightPoints: number
-  context: SquadContext
+  context?: SquadContext
 }
 
 export interface DeveloperWeeklyKpiInput {
@@ -67,21 +67,29 @@ export interface DeveloperWeeklyKpiInput {
   }
 }
 
+export interface SquadWeeklyKpiInput {
+  squadId: string
+  kpi: number | null
+  isInactive?: boolean
+}
+
 export interface WeeklyKpiResult {
   value: number | null
-  status: 'OFFICIAL' | 'PROVISIONAL' | 'NA' | 'INCOMPLETE'
+  status: 'OFFICIAL' | 'PROVISIONAL' | 'PENDING' | 'NA' | 'INCOMPLETE'
   reason?: string
   taskCount?: number
   totalWeight?: number
 }
 
 export interface PmWeeklyKpiInput {
+  pm?: { score?: number; status?: ExecScoreStatusType } // 40% PM Self-Evaluation (§4.1)
   cto?: { score?: number; status?: ExecScoreStatusType; suggestedScore?: number }
   cpo?: { score?: number; status?: ExecScoreStatusType; suggestedScore?: number }
   cfo?: { score?: number; status?: ExecScoreStatusType; suggestedScore?: number }
   chro?: { score?: number; status?: ExecScoreStatusType; suggestedScore?: number }
   hasCompletions: boolean // PM completed >= 1 project milestone/deliverable review
   weights?: {
+    pm?: number
     cto?: number
     cpo?: number
     cfo?: number
@@ -90,16 +98,27 @@ export interface PmWeeklyKpiInput {
 }
 
 export interface CLevelWeeklyKpiInput {
-  companyGoal: number
-  domainExecution: number | null
-  ceoReview: number
-  peerSynergy: number | null
+  executiveRole?: ExecRoleType // role of the executive being evaluated
+  ceoReview?: { score?: number; status?: ExecScoreStatusType } | number // 60% CEO (§4.2)
+  cto?: { score?: number; status?: ExecScoreStatusType } // 10% CTO
+  cfo?: { score?: number; status?: ExecScoreStatusType } // 10% CFO
+  chro?: { score?: number; status?: ExecScoreStatusType } // 10% CHRO
+  cpo?: { score?: number; status?: ExecScoreStatusType } // 10% CPO
   weights?: {
+    ceo?: number
+    cto?: number
+    cfo?: number
+    chro?: number
+    cpo?: number
     companyGoal?: number
     domainExecution?: number
     ceoReview?: number
     peerSynergy?: number
   }
+  // Legacy fields preserved for backward compatibility
+  companyGoal?: number
+  domainExecution?: number | null
+  peerSynergy?: number | null
 }
 
 export interface CeoWeeklyKpiInput {
@@ -114,6 +133,7 @@ export interface CeoWeeklyKpiInput {
 export interface InactivityDetectionInput {
   completedCount: number
   weekStart: Date
+  queuePenalty?: boolean
   excusedWeek?: {
     isExcused: boolean
     reason?: string

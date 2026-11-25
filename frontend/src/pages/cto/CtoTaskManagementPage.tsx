@@ -169,7 +169,7 @@ export function CtoTaskManagementPage() {
       .filter(Boolean)
 
     const weightPts =
-      ({ SMALL: 1, MEDIUM: 2, LARGE: 3, CRITICAL: 5 } as const)[weightCategory as 'SMALL' | 'MEDIUM' | 'LARGE' | 'CRITICAL'] ?? customWeightPoints
+      ({ SMALL: 1, MEDIUM: 3, LARGE: 5, CRITICAL: 7 } as const)[weightCategory as 'SMALL' | 'MEDIUM' | 'LARGE' | 'CRITICAL'] ?? customWeightPoints
 
     createCtoEngineeringTask({
       projectId,
@@ -612,10 +612,10 @@ export function CtoTaskManagementPage() {
                 className="w-full text-xs px-3 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-lime-500 cursor-pointer"
               >
                 <option value="SMALL">SMALL (1 pt / 10 XP)</option>
-                <option value="MEDIUM">MEDIUM (2 pts / 20 XP)</option>
-                <option value="LARGE">LARGE (3 pts / 30 XP)</option>
-                <option value="CRITICAL">CRITICAL (5 pts / 50 XP)</option>
-                <option value="CUSTOM">CUSTOM</option>
+                <option value="MEDIUM">MEDIUM (3 pts / 30 XP)</option>
+                <option value="LARGE">LARGE (5 pts / 50 XP)</option>
+                <option value="CRITICAL">CRITICAL (7 pts / 70 XP)</option>
+                <option value="CUSTOM">CUSTOM (10x approved weight)</option>
               </select>
             </div>
 
