@@ -72,7 +72,7 @@ export function ChroPerformancePage() {
   const [directTaskAssignee, setDirectTaskAssignee] = useState('')
   const [directTaskProject, setDirectTaskProject] = useState('')
   const [directTaskWeightCat, setDirectTaskWeightCat] = useState<'SMALL' | 'MEDIUM' | 'LARGE' | 'CRITICAL' | 'CUSTOM'>('MEDIUM')
-  const [directTaskWeightPoints, setDirectTaskWeightPoints] = useState<number>(2)
+  const [directTaskWeightPoints, setDirectTaskWeightPoints] = useState<number>(3)
   const [directTaskCompletedImmediately, setDirectTaskCompletedImmediately] = useState(true)
   const [directTaskScore, setDirectTaskScore] = useState<number>(92)
   const [submittingDirectTask, setSubmittingDirectTask] = useState(false)
@@ -80,7 +80,7 @@ export function ChroPerformancePage() {
   // ponytail: CHRO Task Weight Modification State
   const [editingWeightTask, setEditingWeightTask] = useState<any | null>(null)
   const [editWeightCategory, setEditWeightCategory] = useState<'SMALL' | 'MEDIUM' | 'LARGE' | 'CRITICAL' | 'CUSTOM'>('MEDIUM')
-  const [editWeightPoints, setEditWeightPoints] = useState<number>(2)
+  const [editWeightPoints, setEditWeightPoints] = useState<number>(3)
   const [editWeightReason, setEditWeightReason] = useState<string>('')
   const [submittingWeightChange, setSubmittingWeightChange] = useState<boolean>(false)
 
@@ -290,8 +290,8 @@ export function ChroPerformancePage() {
     try {
       const pts = Number(directTaskWeightPoints)
       const cat =
-        directTaskWeightCat !== 'CUSTOM' && ({ 1: 'SMALL', 2: 'MEDIUM', 3: 'LARGE', 5: 'CRITICAL' } as const)[pts]
-          ? ({ 1: 'SMALL', 2: 'MEDIUM', 3: 'LARGE', 5: 'CRITICAL' } as const)[pts]!
+        directTaskWeightCat !== 'CUSTOM' && ({ 1: 'SMALL', 3: 'MEDIUM', 5: 'LARGE', 7: 'CRITICAL' } as const)[pts]
+          ? ({ 1: 'SMALL', 3: 'MEDIUM', 5: 'LARGE', 7: 'CRITICAL' } as const)[pts]!
           : 'CUSTOM'
 
       await erpApi.createTask({
@@ -339,8 +339,8 @@ export function ChroPerformancePage() {
       }
 
       const cat =
-        editWeightCategory !== 'CUSTOM' && ({ 1: 'SMALL', 2: 'MEDIUM', 3: 'LARGE', 5: 'CRITICAL' } as const)[pts]
-          ? ({ 1: 'SMALL', 2: 'MEDIUM', 3: 'LARGE', 5: 'CRITICAL' } as const)[pts]!
+        editWeightCategory !== 'CUSTOM' && ({ 1: 'SMALL', 3: 'MEDIUM', 5: 'LARGE', 7: 'CRITICAL' } as const)[pts]
+          ? ({ 1: 'SMALL', 3: 'MEDIUM', 5: 'LARGE', 7: 'CRITICAL' } as const)[pts]!
           : 'CUSTOM'
 
       await erpApi.changeTaskWeight(editingWeightTask.id, {
@@ -1483,7 +1483,7 @@ export function ChroPerformancePage() {
                               onClick={() => {
                                 setEditingWeightTask(task)
                                 setEditWeightCategory(task.weightCategory || 'MEDIUM')
-                                setEditWeightPoints(Number(task.weightPoints || 2))
+                                setEditWeightPoints(Number(task.weightPoints || 3))
                                 setEditWeightReason('')
                               }}
                             >
@@ -1753,7 +1753,7 @@ export function ChroPerformancePage() {
                                 }
                                 setEditingWeightTask(t)
                                 setEditWeightCategory(item.category || 'MEDIUM')
-                                setEditWeightPoints(Number(item.approvedWeight || item.proposedWeight || 2))
+                                setEditWeightPoints(Number(item.approvedWeight || item.proposedWeight || 3))
                                 setEditWeightReason('')
                               }}
                             >
@@ -3000,14 +3000,14 @@ export function ChroPerformancePage() {
               <div className="grid grid-cols-5 gap-1.5 mb-2">
                 {[
                   { cat: 'SMALL', pts: 1, label: '1 pt' },
-                  { cat: 'MEDIUM', pts: 2, label: '2 pts' },
-                  { cat: 'LARGE', pts: 3, label: '3 pts' },
-                  { cat: 'CRITICAL', pts: 5, label: '5 pts' },
+                  { cat: 'MEDIUM', pts: 3, label: '3 pts' },
+                  { cat: 'LARGE', pts: 5, label: '5 pts' },
+                  { cat: 'CRITICAL', pts: 7, label: '7 pts' },
                   { cat: 'CUSTOM', pts: directTaskWeightPoints, label: 'Custom' },
                 ].map((item) => {
                   const isSel =
                     item.cat === 'CUSTOM'
-                      ? directTaskWeightCat === 'CUSTOM' || ![1, 2, 3, 5].includes(directTaskWeightPoints)
+                      ? directTaskWeightCat === 'CUSTOM' || ![1, 3, 5, 7].includes(directTaskWeightPoints)
                       : directTaskWeightCat === item.cat && directTaskWeightPoints === item.pts
                   return (
                     <button
@@ -3122,7 +3122,7 @@ export function ChroPerformancePage() {
               <div className="flex justify-between">
                 <span className="text-slate-500">Current Weight:</span>
                 <span className="font-bold text-amber-600">
-                  {Number(editingWeightTask.weightPoints || editingWeightTask.proposedWeight || 2)} pts (
+                  {Number(editingWeightTask.weightPoints || editingWeightTask.proposedWeight || 3)} pts (
                   {editingWeightTask.weightCategory || editingWeightTask.category || 'MEDIUM'})
                 </span>
               </div>
@@ -3134,15 +3134,15 @@ export function ChroPerformancePage() {
               </label>
               <div className="grid grid-cols-5 gap-1.5 mb-3">
                 {[
-                  { cat: 'SMALL', pts: 1, label: '1 pt', sub: 'SMALL' },
-                  { cat: 'MEDIUM', pts: 2, label: '2 pts', sub: 'MEDIUM' },
-                  { cat: 'LARGE', pts: 3, label: '3 pts', sub: 'LARGE' },
-                  { cat: 'CRITICAL', pts: 5, label: '5 pts', sub: 'CRITICAL' },
-                  { cat: 'CUSTOM', pts: editWeightPoints, label: 'Custom', sub: 'Any pts' },
+                  { cat: 'SMALL', pts: 1, label: '1 pt', sub: '10 XP' },
+                  { cat: 'MEDIUM', pts: 3, label: '3 pts', sub: '30 XP' },
+                  { cat: 'LARGE', pts: 5, label: '5 pts', sub: '50 XP' },
+                  { cat: 'CRITICAL', pts: 7, label: '7 pts', sub: '70 XP' },
+                  { cat: 'CUSTOM', pts: editWeightPoints, label: 'Custom', sub: '10x XP' },
                 ].map((item) => {
                   const isSelected =
                     item.cat === 'CUSTOM'
-                      ? editWeightCategory === 'CUSTOM' || ![1, 2, 3, 5].includes(editWeightPoints)
+                      ? editWeightCategory === 'CUSTOM' || ![1, 3, 5, 7].includes(editWeightPoints)
                       : editWeightCategory === item.cat && editWeightPoints === item.pts
                   return (
                     <button

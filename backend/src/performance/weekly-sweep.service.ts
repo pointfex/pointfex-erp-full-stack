@@ -258,7 +258,7 @@ export class WeeklySweepService {
       }
 
       // ----------------------------------------------------------------------
-      // Step 4: Safety Net - Release PENDING XP with VERIFIED Weights
+      // Step 4: Safety Net - Release PENDING XP with VERIFIED Weights (Idempotent)
       // ----------------------------------------------------------------------
       const unpostedVerified = await this.prisma.xpLedgerEntry.findMany({
         where: {
@@ -271,7 +271,17 @@ export class WeeklySweepService {
       })
 
       for (const entry of unpostedVerified) {
-        if (!entry.task) continue
+        if (!entry.task || !entry.taskId) continue
+
+        // Check if VERIFY_RELEASE or FREEZE already posted for this task to prevent infinite duplicate release
+        const alreadyReleased = await this.prisma.xpLedgerEntry.findFirst({
+          where: {
+            taskId: entry.taskId,
+            eventType: { in: ['VERIFY_RELEASE', 'FREEZE'] },
+          },
+        })
+        if (alreadyReleased) continue
+
         await this.xpLedger.appendEvent({
           employeeId: entry.employeeId,
           delta: entry.delta,

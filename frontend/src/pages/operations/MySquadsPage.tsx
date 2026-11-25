@@ -508,13 +508,13 @@ export function MySquadsPage() {
       estimatedHours: taskEstimatedHours,
       proposedWeight: finalPoints,
       weightCategory:
-        finalXp >= 100
+        finalXp >= 70
           ? 'CRITICAL'
           : finalXp >= 50
-            ? 'HIGH'
+            ? 'LARGE'
             : finalXp >= 30
               ? 'MEDIUM'
-              : 'LOW',
+              : 'SMALL',
       isMainProjectTask,
       projectPercentage: isMainProjectTask ? Number(projectPercentage) : 0,
     })

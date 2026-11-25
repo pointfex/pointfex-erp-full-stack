@@ -113,10 +113,25 @@ describe('KPI & XP Engine Parity & Intentional Divergences (v3.14.0 Legacy vs Pu
         cpo: { score: 95, status: 'CONFIRMED' },
         cfo: { score: 80, status: 'CONFIRMED' },
         chro: { score: 80, status: 'CONFIRMED' },
+        weights: { pm: 0.50, cto: 0.15, cpo: 0.15, cfo: 0.10, chro: 0.10 },
       })
       expect(pureResult.baseScore).toBe(88.0)
       expect(pureResult.finalScore).toBe(88.0)
       expect(pureResult.isProvisional).toBe(false)
+    })
+
+    it('INTENTIONAL DIVERGENCE: CHRO v4.2 assigns 40% PM and 15% each to CTO, CPO, CFO, CHRO', () => {
+      const v42Result = taskScoreDeveloper({
+        pm: { score: 90 },
+        cto: { score: 85, status: 'CONFIRMED' },
+        cpo: { score: 95, status: 'CONFIRMED' },
+        cfo: { score: 80, status: 'CONFIRMED' },
+        chro: { score: 80, status: 'CONFIRMED' },
+      })
+      // 90*0.40 (36) + 85*0.15 (12.75) + 95*0.15 (14.25) + 80*0.15 (12) + 80*0.15 (12) = 87.0
+      expect(v42Result.baseScore).toBe(87.0)
+      expect(v42Result.finalScore).toBe(87.0)
+      expect(v42Result.isProvisional).toBe(false)
     })
 
     it('INTENTIONAL DIVERGENCE: Inactivity penalty is multiplicative (score * 0.90) rather than flat (-10 points)', () => {

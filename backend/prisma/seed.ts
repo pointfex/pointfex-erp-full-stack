@@ -28,10 +28,10 @@ async function main() {
 
   // 2. Seed Default Task Weight Configurations
   const weightConfigs = [
-    { category: 'SMALL' as const, points: new Prisma.Decimal(1), description: 'Small bug fixes, copy changes, minor config' },
-    { category: 'MEDIUM' as const, points: new Prisma.Decimal(2), description: 'Standard feature implementation, component redesign' },
-    { category: 'LARGE' as const, points: new Prisma.Decimal(3), description: 'Complex modules, major integrations, architectural spikes' },
-    { category: 'CRITICAL' as const, points: new Prisma.Decimal(5), description: 'Critical incident response, platform core refactors' },
+    { category: 'SMALL' as const, points: new Prisma.Decimal(1), description: 'Small bug fixes, copy changes, minor config (1 pt / 10 XP)' },
+    { category: 'MEDIUM' as const, points: new Prisma.Decimal(3), description: 'Standard feature implementation, component redesign (3 pts / 30 XP)' },
+    { category: 'LARGE' as const, points: new Prisma.Decimal(5), description: 'Complex modules, major integrations, architectural spikes (5 pts / 50 XP)' },
+    { category: 'CRITICAL' as const, points: new Prisma.Decimal(7), description: 'Critical incident response, platform core refactors (7 pts / 70 XP)' },
   ]
   for (const wc of weightConfigs) {
     await prisma.taskWeightConfig.upsert({
@@ -51,28 +51,28 @@ async function main() {
     where: { id: 'singleton' },
     update: {
       massiveXpThreshold: 200,
-      inactivityPenalty: new Prisma.Decimal(0.10),
+      inactivityPenalty: new Prisma.Decimal(0.00),
       mainSquadMultiplier: new Prisma.Decimal(1.00),
       outsideSquadMultiplier: new Prisma.Decimal(0.70),
       isolatedExecMultiplier: new Prisma.Decimal(0.50),
-      devPmWeight: new Prisma.Decimal(0.50),
+      devPmWeight: new Prisma.Decimal(0.40),
       devCtoWeight: new Prisma.Decimal(0.15),
       devCpoWeight: new Prisma.Decimal(0.15),
-      devCfoWeight: new Prisma.Decimal(0.10),
-      devChroWeight: new Prisma.Decimal(0.10),
+      devCfoWeight: new Prisma.Decimal(0.15),
+      devChroWeight: new Prisma.Decimal(0.15),
     },
     create: {
       id: 'singleton',
       massiveXpThreshold: 200,
-      inactivityPenalty: new Prisma.Decimal(0.10),
+      inactivityPenalty: new Prisma.Decimal(0.00),
       mainSquadMultiplier: new Prisma.Decimal(1.00),
       outsideSquadMultiplier: new Prisma.Decimal(0.70),
       isolatedExecMultiplier: new Prisma.Decimal(0.50),
-      devPmWeight: new Prisma.Decimal(0.50),
+      devPmWeight: new Prisma.Decimal(0.40),
       devCtoWeight: new Prisma.Decimal(0.15),
       devCpoWeight: new Prisma.Decimal(0.15),
-      devCfoWeight: new Prisma.Decimal(0.10),
-      devChroWeight: new Prisma.Decimal(0.10),
+      devCfoWeight: new Prisma.Decimal(0.15),
+      devChroWeight: new Prisma.Decimal(0.15),
     },
   })
 
