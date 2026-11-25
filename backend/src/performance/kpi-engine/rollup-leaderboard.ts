@@ -44,18 +44,22 @@ export function kpiTrendSeries(
 
   return sorted.map((w) => {
     let statusDisplay = 'N/A'
-    if (!w.isInactive && w.score !== null) {
-      statusDisplay = w.score.toFixed(2)
+    if (w.isInactive) {
+      statusDisplay = 'N/A'
+    } else if (w.score !== null) {
+      statusDisplay = round2(w.score).toFixed(2)
       if (w.isProvisional) {
         statusDisplay = `Provisional (${statusDisplay})`
       }
+    } else {
+      statusDisplay = 'Pending'
     }
 
     return {
       weekNumber: w.weekNumber,
       year: w.year,
       score: w.isInactive || w.score === null ? null : round2(w.score),
-      isInactive: w.isInactive || w.score === null,
+      isInactive: Boolean(w.isInactive),
       isProvisional: Boolean(w.isProvisional),
       statusDisplay,
       pmScore: w.pmScore ?? null,
@@ -63,7 +67,7 @@ export function kpiTrendSeries(
       cpoScore: w.cpoScore ?? null,
       cfoScore: w.cfoScore ?? null,
       chroScore: w.chroScore ?? null,
-      inactivityPenaltyApplied: Boolean(w.inactivityPenaltyApplied),
+      inactivityPenaltyApplied: false,
       breakdown: w.breakdown,
     }
   })

@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../common/prisma.service'
 import { AuthenticatedUser } from '../common/auth-user.interface'
 import { applyDisciplinaryDeduction } from './kpi-engine'
+import { getDhakaWeekBoundaries } from '../common/dhaka-time.util'
 import { Prisma } from '@prisma/client'
 import * as crypto from 'crypto'
 
@@ -71,34 +72,44 @@ export class DisciplinaryService {
       })
 
       // 2. Fetch target week's WeeklyKpiRecord
+      const weekBounds = getDhakaWeekBoundaries(targetWeekStart)
       const weeklyRecord = await tx.weeklyKpiRecord.findFirst({
         where: {
           employeeId: dto.userId,
-          weekStart: targetWeekStart,
+          OR: [
+            { weekStart: targetWeekStart },
+            { year: weekBounds.year, weekNumber: weekBounds.weekNumber },
+          ],
         },
       })
 
-      let valueBefore: Prisma.Decimal | null = null
-      let valueAfter: Prisma.Decimal | null = null
-
-      if (weeklyRecord) {
-        valueBefore = weeklyRecord.score
-        const baseScore = weeklyRecord.score ? Number(weeklyRecord.score) : null
-
-        const deductionResult = applyDisciplinaryDeduction({
-          weeklyValue: baseScore,
-          points,
-        })
-
-        valueAfter = deductionResult.value !== null ? new Prisma.Decimal(deductionResult.value) : null
-
-        await tx.weeklyKpiRecord.update({
-          where: { id: weeklyRecord.id },
-          data: {
-            score: valueAfter,
-          },
-        })
+      if (!weeklyRecord || weeklyRecord.isInactive || weeklyRecord.score === null) {
+        throw new BadRequestException(
+          'No KPI deduction shall be applied to an N/A week (inactivity week), and no deduction shall carry forward from that week per CHRO Policy §2.4.',
+        )
       }
+
+      const valueBefore = weeklyRecord.score
+      const baseScore = Number(weeklyRecord.score)
+
+      const deductionResult = applyDisciplinaryDeduction({
+        weeklyValue: baseScore,
+        points,
+      })
+
+      if (!deductionResult.deductionApplied || deductionResult.value === null) {
+        throw new BadRequestException('Disciplinary deduction could not be applied to the target week.')
+      }
+
+      const valueAfter = new Prisma.Decimal(deductionResult.value)
+      const actualDelta = Number(valueAfter) - Number(valueBefore)
+
+      await tx.weeklyKpiRecord.update({
+        where: { id: weeklyRecord.id },
+        data: {
+          score: valueAfter,
+        },
+      })
 
       // 3. Append negative KPI audit log event
       await this.appendKpiAudit(tx, {
@@ -106,7 +117,7 @@ export class DisciplinaryService {
         actionType: 'CHRO_DISCIPLINARY',
         valueBefore,
         valueAfter,
-        deltaValue: new Prisma.Decimal(-points),
+        deltaValue: new Prisma.Decimal(actualDelta),
         reason: `Disciplinary deduction: -${points} pts [Ref: ${dto.referenceDocId}] - ${dto.reason.trim()}`,
         actorId: actor.id,
         authorizedRole: actorRole.toUpperCase(),

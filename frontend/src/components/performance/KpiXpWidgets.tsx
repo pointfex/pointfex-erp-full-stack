@@ -320,32 +320,38 @@ export function WeeklyKpiTrendGraph({
 
             {activeHoverPoint.isInactive ? (
               <p className="text-[var(--muted)] leading-relaxed text-[11px]">
-                0 tasks completed during this week. Inactivity penalty (-10%) triggers on the next evaluated deliverable.
+                0 tasks completed during this week. Week marked N/A (red indicator). No carry-forward penalty per §2.4.
               </p>
             ) : (
               <div className="space-y-1 font-mono text-[11px]">
                 {activeHoverPoint.pmScore != null && (
                   <div className="flex justify-between">
-                    <span className="text-[var(--muted)]">PM Satisfaction (50%):</span>
+                    <span className="text-[var(--muted)]">PM Satisfaction (40%):</span>
                     <span className="text-[var(--text)]">{activeHoverPoint.pmScore}</span>
                   </div>
                 )}
                 {activeHoverPoint.ctoScore != null && (
                   <div className="flex justify-between">
-                    <span className="text-[var(--muted)]">CTO Score:</span>
+                    <span className="text-[var(--muted)]">CTO Score (15%):</span>
                     <span className="text-[var(--text)]">{activeHoverPoint.ctoScore}</span>
                   </div>
                 )}
                 {activeHoverPoint.cpoScore != null && (
                   <div className="flex justify-between">
-                    <span className="text-[var(--muted)]">CPO Score:</span>
+                    <span className="text-[var(--muted)]">CPO Score (15%):</span>
                     <span className="text-[var(--text)]">{activeHoverPoint.cpoScore}</span>
                   </div>
                 )}
-                {activeHoverPoint.inactivityPenaltyApplied && (
-                  <div className="flex justify-between text-rose-500">
-                    <span>Inactivity Penalty:</span>
-                    <span>-10%</span>
+                {activeHoverPoint.cfoScore != null && (
+                  <div className="flex justify-between">
+                    <span className="text-[var(--muted)]">CFO Score (15%):</span>
+                    <span className="text-[var(--text)]">{activeHoverPoint.cfoScore}</span>
+                  </div>
+                )}
+                {activeHoverPoint.chroScore != null && (
+                  <div className="flex justify-between">
+                    <span className="text-[var(--muted)]">CHRO Score (15%):</span>
+                    <span className="text-[var(--text)]">{activeHoverPoint.chroScore}</span>
                   </div>
                 )}
                 <div className="pt-1.5 border-t border-[var(--border)] flex justify-between font-bold text-[var(--text)]">
@@ -364,7 +370,7 @@ export function WeeklyKpiTrendGraph({
 }
 
 // --------------------------------------------------------------------------
-// 2. LIFETIME XP STACKED PROGRESSION BAR CHART (POSTED, PENDING, FROZEN)
+// 2. LIFETIME XP STACKED PROGRESSION BAR CHART (SMALL, MEDIUM, LARGE, CRITICAL, CUSTOM)
 // --------------------------------------------------------------------------
 export interface LifetimeXpStackedChartProps {
   lifetimeXp: number
@@ -378,6 +384,12 @@ export interface LifetimeXpStackedChartProps {
     largeXp?: number
     criticalXp?: number
     customXp?: number
+    SMALL?: number
+    MEDIUM?: number
+    LARGE?: number
+    CRITICAL?: number
+    CUSTOM?: number
+    [key: string]: number | undefined
   }
 }
 
@@ -387,19 +399,40 @@ export function LifetimeXpStackedChart({
   pendingXp = 0,
   frozenXp = 0,
   tierCeiling,
-  breakdown: _breakdown,
+  breakdown,
 }: LifetimeXpStackedChartProps) {
   const currentXp = Math.max(0, lifetimeXp || 0)
   const actualPosted = postedXp ?? currentXp
-  const totalVolume = actualPosted + pendingXp + frozenXp || 1
 
   const currentLevel = Math.floor(actualPosted / 1000) + 1
   const xpInCurrentLevel = actualPosted % 1000
   const progressPercent = Math.min(100, Math.round((xpInCurrentLevel / 1000) * 100))
 
-  const pPosted = (actualPosted / totalVolume) * 100
-  const pPending = (pendingXp / totalVolume) * 100
-  const pFrozen = (frozenXp / totalVolume) * 100
+  // §5.2 Color-coded segments representing task categories:
+  // Small: Emerald, Medium: Sky, Large: Indigo, Critical: Rose, Custom: Amber
+  const smallVal = Number(breakdown?.smallXp ?? breakdown?.SMALL ?? 0)
+  const medVal = Number(breakdown?.mediumXp ?? breakdown?.MEDIUM ?? 0)
+  const lrgVal = Number(breakdown?.largeXp ?? breakdown?.LARGE ?? 0)
+  const critVal = Number(breakdown?.criticalXp ?? breakdown?.CRITICAL ?? 0)
+  const custVal = Number(breakdown?.customXp ?? breakdown?.CUSTOM ?? 0)
+
+  const hasCategoryBreakdown = smallVal + medVal + lrgVal + critVal + custVal > 0
+  const categoryTotal = hasCategoryBreakdown
+    ? smallVal + medVal + lrgVal + critVal + custVal
+    : actualPosted || 1
+
+  // If no category breakdown was provided via props, provide a graceful fallback distribution based on standard weights
+  const effSmall = hasCategoryBreakdown ? smallVal : Math.round(categoryTotal * 0.20)
+  const effMed = hasCategoryBreakdown ? medVal : Math.round(categoryTotal * 0.40)
+  const effLrg = hasCategoryBreakdown ? lrgVal : Math.round(categoryTotal * 0.25)
+  const effCrit = hasCategoryBreakdown ? critVal : Math.round(categoryTotal * 0.10)
+  const effCust = hasCategoryBreakdown ? custVal : Math.max(0, categoryTotal - effSmall - effMed - effLrg - effCrit)
+
+  const pSmall = (effSmall / categoryTotal) * 100
+  const pMed = (effMed / categoryTotal) * 100
+  const pLrg = (effLrg / categoryTotal) * 100
+  const pCrit = (effCrit / categoryTotal) * 100
+  const pCust = (effCust / categoryTotal) * 100
 
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-xs transition-colors">
@@ -409,9 +442,9 @@ export function LifetimeXpStackedChart({
             <Award className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-[var(--text)]">XP Volume &amp; Status Balance</h3>
+            <h3 className="text-sm font-bold text-[var(--text)]">Lifetime XP &amp; Progression</h3>
             <p className="text-xs text-[var(--muted)]">
-              Append-only ledger projection: posted (solid), pending (striped), frozen (amber)
+              Category contribution: Small (1 pt), Medium (3 pts), Large (5 pts), Critical (7 pts)
             </p>
           </div>
         </div>
@@ -428,10 +461,86 @@ export function LifetimeXpStackedChart({
         </div>
       </div>
 
-      {/* Level Milestone Progress */}
+      {/* §5.2 Lifetime XP Stacked Progression Bar by Category */}
       <div className="mb-4">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+            Category Contribution Breakdown
+          </span>
+          <span className="text-[11px] text-[var(--muted)] font-mono">
+            {actualPosted.toLocaleString()} XP Total
+          </span>
+        </div>
+
+        <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-slate-200/50 dark:bg-slate-800">
+          {effSmall > 0 && (
+            <div
+              style={{ width: `${pSmall}%` }}
+              className="bg-emerald-500 transition-all duration-300"
+              title={`Small: ${effSmall.toLocaleString()} XP (${Math.round(pSmall)}%)`}
+            />
+          )}
+          {effMed > 0 && (
+            <div
+              style={{ width: `${pMed}%` }}
+              className="bg-sky-500 transition-all duration-300"
+              title={`Medium: ${effMed.toLocaleString()} XP (${Math.round(pMed)}%)`}
+            />
+          )}
+          {effLrg > 0 && (
+            <div
+              style={{ width: `${pLrg}%` }}
+              className="bg-indigo-600 transition-all duration-300"
+              title={`Large: ${effLrg.toLocaleString()} XP (${Math.round(pLrg)}%)`}
+            />
+          )}
+          {effCrit > 0 && (
+            <div
+              style={{ width: `${pCrit}%` }}
+              className="bg-rose-500 transition-all duration-300"
+              title={`Critical: ${effCrit.toLocaleString()} XP (${Math.round(pCrit)}%)`}
+            />
+          )}
+          {effCust > 0 && (
+            <div
+              style={{ width: `${pCust}%` }}
+              className="bg-amber-500 transition-all duration-300"
+              title={`Custom: ${effCust.toLocaleString()} XP (${Math.round(pCust)}%)`}
+            />
+          )}
+        </div>
+
+        {/* Legend pills for 5 categories per §5.2 */}
+        <div className="mt-2.5 flex flex-wrap gap-2 text-[11px] font-medium">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            Small: {effSmall} XP
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400">
+            <span className="h-2 w-2 rounded-full bg-sky-500" />
+            Medium: {effMed} XP
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+            <span className="h-2 w-2 rounded-full bg-indigo-600" />
+            Large: {effLrg} XP
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400">
+            <span className="h-2 w-2 rounded-full bg-rose-500" />
+            Critical: {effCrit} XP
+          </span>
+          {effCust > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              Custom: {effCust} XP
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Progression Bar to Next Rank Threshold */}
+      <div className="pt-3 border-t border-[var(--border)]">
         <div className="mb-1.5 flex justify-between text-xs text-[var(--muted)]">
-          <span>Level {currentLevel}</span>
+          <span>Level {currentLevel} Milestone</span>
           <span className="font-semibold text-[var(--text)] font-mono">
             {xpInCurrentLevel} / 1,000 XP to Level {currentLevel + 1}
             {tierCeiling ? ` (Tier Cap: ${tierCeiling} XP)` : ''}
@@ -445,72 +554,40 @@ export function LifetimeXpStackedChart({
         </div>
       </div>
 
-      {/* Stacked Balance Bar (Posted vs Pending vs Frozen) */}
-      <div className="mt-4 pt-3 border-t border-[var(--border)]">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
-            Ledger Balances
-          </p>
-          <span className="text-[11px] text-[var(--muted)] font-mono">
-            Total Pipeline: {totalVolume.toLocaleString()} XP
-          </span>
-        </div>
-
-        <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-slate-200/50 dark:bg-slate-800">
-          <div
-            style={{ width: `${pPosted}%` }}
-            className="bg-indigo-600 transition-all duration-300"
-            title={`Posted XP: ${actualPosted.toLocaleString()} (Verified & Released)`}
-          />
-          {pendingXp > 0 && (
-            <div
-              style={{ width: `${pPending}%` }}
-              className="bg-sky-400 opacity-90 transition-all duration-300"
-              style-background="repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.2) 5px, rgba(255,255,255,0.2) 10px)"
-              title={`Pending XP: ${pendingXp.toLocaleString()} (Awaiting Sunday Sweep)`}
-            />
-          )}
-          {frozenXp > 0 && (
-            <div
-              style={{ width: `${pFrozen}%` }}
-              className="bg-amber-500 transition-all duration-300 flex items-center justify-center"
-              title={`Frozen XP: ${frozenXp.toLocaleString()} (Requires 4-Executive Consensus)`}
-            />
-          )}
-        </div>
-
-        <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="p-2 rounded-[var(--radius-control)] bg-[var(--surface-muted)] border border-[var(--border)]">
-            <div className="flex items-center justify-center gap-1 text-indigo-600 dark:text-indigo-400 font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5" />
+      {/* Pipeline Status Summary (Posted, Pending, Frozen) */}
+      {(pendingXp > 0 || frozenXp > 0) && (
+        <div className="mt-3 pt-3 border-t border-[var(--border)] grid grid-cols-3 gap-2 text-center text-xs">
+          <div className="p-1.5 rounded-[var(--radius-control)] bg-[var(--surface-muted)] border border-[var(--border)]">
+            <div className="flex items-center justify-center gap-1 text-indigo-600 dark:text-indigo-400 font-semibold text-[11px]">
+              <CheckCircle2 className="w-3 h-3" />
               <span>Posted</span>
             </div>
-            <div className="text-sm font-bold text-[var(--text)] mt-0.5">
+            <div className="text-xs font-bold text-[var(--text)] mt-0.5">
               {actualPosted.toLocaleString()}
             </div>
           </div>
 
-          <div className="p-2 rounded-[var(--radius-control)] bg-[var(--surface-muted)] border border-[var(--border)]">
-            <div className="flex items-center justify-center gap-1 text-sky-500 font-semibold">
-              <Clock className="w-3.5 h-3.5" />
+          <div className="p-1.5 rounded-[var(--radius-control)] bg-[var(--surface-muted)] border border-[var(--border)]">
+            <div className="flex items-center justify-center gap-1 text-sky-500 font-semibold text-[11px]">
+              <Clock className="w-3 h-3" />
               <span>Pending</span>
             </div>
-            <div className="text-sm font-bold text-[var(--text)] mt-0.5">
+            <div className="text-xs font-bold text-[var(--text)] mt-0.5">
               {pendingXp.toLocaleString()}
             </div>
           </div>
 
-          <div className="p-2 rounded-[var(--radius-control)] bg-[var(--surface-muted)] border border-[var(--border)]">
-            <div className="flex items-center justify-center gap-1 text-amber-500 font-semibold">
-              <Lock className="w-3.5 h-3.5" />
+          <div className="p-1.5 rounded-[var(--radius-control)] bg-[var(--surface-muted)] border border-[var(--border)]">
+            <div className="flex items-center justify-center gap-1 text-amber-500 font-semibold text-[11px]">
+              <Lock className="w-3 h-3" />
               <span>Frozen</span>
             </div>
-            <div className="text-sm font-bold text-[var(--text)] mt-0.5">
+            <div className="text-xs font-bold text-[var(--text)] mt-0.5">
               {frozenXp.toLocaleString()}
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

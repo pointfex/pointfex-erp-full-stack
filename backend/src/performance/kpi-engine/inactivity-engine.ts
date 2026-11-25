@@ -29,7 +29,7 @@ export function detectInactivity(input: InactivityDetectionInput): InactivityDet
     return {
       isInactive: true,
       isExcused: false,
-      penaltyQueued: true,
+      penaltyQueued: input.queuePenalty ?? true,
       reason: 'Inactivity: Zero deliverables or reviews completed during weekly cycle',
     }
   }

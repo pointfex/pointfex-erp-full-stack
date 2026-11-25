@@ -87,7 +87,7 @@ export function MyPerformancePage() {
               balanceAfter: `${(idx + 1) * xpVal} XP`,
               reason: `Deliverable verified & finalized: ${t.title}`,
               taskId: t.id,
-              taskCategory: t.weightCategory || (points >= 5 ? 'CRITICAL' : points >= 3 ? 'LARGE' : 'MEDIUM'),
+              taskCategory: t.weightCategory || (points >= 7 ? 'CRITICAL' : points >= 5 ? 'LARGE' : points >= 3 ? 'MEDIUM' : 'SMALL'),
               authorizedRole: t.creatorId?.includes('cto') ? 'CTO' : t.creatorId?.includes('ceo') ? 'CEO' : 'CHRO',
               status: 'VERIFIED',
               recordedAt: t.completedAt || t.dueDate || new Date(Date.now() - (idx + 1) * 86400000).toISOString(),

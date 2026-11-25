@@ -52,7 +52,7 @@ export function PerformanceXpLogsPage() {
     return completedTasks
       .map((t) => {
         const project = data.projects.find((p) => p.id === t.projectId)
-        const xpEarned = (t.weightPoints || 2) * 25
+        const xpEarned = (t.weightPoints || 3) * 10
         const date = t.createdAt || '2026-11-20'
 
         return {
@@ -65,7 +65,7 @@ export function PerformanceXpLogsPage() {
           projectPercentage: t.projectPercentage || 0,
           xpEarned,
           kpiScore: t.pmScore !== undefined ? t.pmScore : 90,
-          weightPoints: t.weightPoints || 2,
+          weightPoints: t.weightPoints || 3,
           status: 'COMPLETED & VERIFIED',
           approvedBy: t.creatorId ? data.users.find((u) => u.id === t.creatorId)?.name || 'Project Manager' : 'Executive Lead',
           ceoFinalized: t.ceoFinalized || false,
