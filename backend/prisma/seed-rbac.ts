@@ -638,6 +638,26 @@ export const ERP_PERMISSIONS: SeedPermissionDef[] = [
 const ALL_PERMISSION_CODES = ERP_PERMISSIONS.map((p) => p.code)
 const MASTER_CATALOG_606_CODES = loadPermissionsMasterCatalog().permissions.map((p) => p.code)
 
+export const CFO_FINANCE_PERMISSIONS = [
+  { code: 'finance_ledger:read_all', resource: 'finance_ledger', action: 'read_all', module: 'finance', name: 'Read All Finance Accounts, Statements & Double-Entry Ledger', isCritical: false, isDelegable: true, isSensitive: true },
+  { code: 'money_requests:create', resource: 'money_requests', action: 'create', module: 'finance', name: 'Create Add Money, Pool Credit & Transfer Requests', isCritical: false, isDelegable: true, isSensitive: false },
+  { code: 'money_requests:approve', resource: 'money_requests', action: 'approve', module: 'finance', name: 'Approve Add Money, Pool Ranking, Transfer, Sprint Lock & Deadline Penalty Requests', isCritical: true, isDelegable: false, isSensitive: true },
+  { code: 'money_requests:post', resource: 'money_requests', action: 'post', module: 'finance', name: 'Post Approved Add Money, Pool Credits & Transfers to Ledger', isCritical: false, isDelegable: false, isSensitive: true },
+  { code: 'payroll:run', resource: 'payroll', action: 'run', module: 'finance', name: 'Generate & Execute Executive and Squad Payroll Runs', isCritical: false, isDelegable: false, isSensitive: true },
+  { code: 'payroll:confirm', resource: 'payroll', action: 'confirm', module: 'finance', name: 'Confirm Squad Payroll Roster Before Execution', isCritical: false, isDelegable: true, isSensitive: false },
+  { code: 'bonus_awards:score', resource: 'bonus_awards', action: 'score', module: 'finance', name: 'Submit Squad Member Sprint Bonus Scores & Evidence', isCritical: false, isDelegable: true, isSensitive: false },
+  { code: 'bonus_awards:approve', resource: 'bonus_awards', action: 'approve', module: 'finance', name: 'Approve or Reject Submitted Bonus Awards', isCritical: true, isDelegable: false, isSensitive: true },
+  { code: 'bonus_awards:disburse', resource: 'bonus_awards', action: 'disburse', module: 'finance', name: 'Disburse CEO-Approved Sprint Bonus Awards from Squad Account', isCritical: false, isDelegable: false, isSensitive: true },
+  { code: 'penalties:record', resource: 'penalties', action: 'record', module: 'finance', name: 'Record Squad Penalty Incidents', isCritical: false, isDelegable: true, isSensitive: false },
+  { code: 'penalties:post', resource: 'penalties', action: 'post', module: 'finance', name: 'Post Recorded Penalties & Split Credits to Ledger', isCritical: false, isDelegable: false, isSensitive: true },
+  { code: 'commissions:run', resource: 'commissions', action: 'run', module: 'finance', name: 'Run Once-Per-Sprint CFO Commission Payout', isCritical: false, isDelegable: false, isSensitive: true },
+  { code: 'sprints:lock', resource: 'sprints', action: 'lock', module: 'finance', name: 'Request Sprint Financial Period Lock', isCritical: false, isDelegable: false, isSensitive: true },
+  { code: 'finance_config:manage', resource: 'finance_config', action: 'manage', module: 'finance', name: 'Manage CFO Treasury Rates, Weights & Penalty Table Config', isCritical: true, isDelegable: false, isSensitive: true },
+  { code: 'finance_reports:export', resource: 'finance_reports', action: 'export', module: 'finance', name: 'Export Double-Entry Financial Statements & Ledger CSV', isCritical: false, isDelegable: true, isSensitive: true },
+] as const
+
+const CFO_FINANCE_PERMISSION_CODES = CFO_FINANCE_PERMISSIONS.map((p) => p.code)
+
 const ROLE_DEFINITIONS: Array<{
   slug: string
   name: string
@@ -720,6 +740,9 @@ const ROLE_DEFINITIONS: Array<{
       'announcements:read',
       'notifications:read_own',
       'permissions:delegate',
+      'money_requests:create',
+      'payroll:confirm',
+      'bonus_awards:score',
     ],
   },
   {
@@ -782,6 +805,7 @@ const ROLE_DEFINITIONS: Array<{
       'announcements:read',
       'notifications:read_own',
       'permissions:delegate',
+      'penalties:record',
     ],
   },
   {
@@ -823,6 +847,16 @@ const ROLE_DEFINITIONS: Array<{
       'announcements:read',
       'notifications:read_own',
       'permissions:delegate',
+      'finance_ledger:read_all',
+      'money_requests:create',
+      'money_requests:post',
+      'payroll:run',
+      'bonus_awards:disburse',
+      'penalties:record',
+      'penalties:post',
+      'commissions:run',
+      'sprints:lock',
+      'finance_reports:export',
     ],
   },
   {
@@ -867,6 +901,31 @@ const ROLE_DEFINITIONS: Array<{
       'announcements:read',
       'notifications:read_own',
       'permissions:delegate',
+      'penalties:record',
+    ],
+  },
+  {
+    slug: 'auditor',
+    name: 'Financial Auditor',
+    description:
+      'Read-Only Financial Auditor — inspects treasury accounts, double-entry ledger statements, audit logs, and CSV exports.',
+    isSystemDefault: true,
+    permissions: [
+      'employees:read_directory',
+      'employees:update_own_profile',
+      'teams:read_all',
+      'projects:read_all',
+      'treasury:read',
+      'wallets:read_all',
+      'transactions:read_all',
+      'budgets:read_requests',
+      'finance_ledger:read_all',
+      'finance_reports:export',
+      'audit_logs:read',
+      'decisions:read',
+      'directives:read',
+      'announcements:read',
+      'notifications:read_own',
     ],
   },
   {
@@ -875,7 +934,7 @@ const ROLE_DEFINITIONS: Array<{
     description:
       'Executive Suite — full strategic, operational, financial, HR, and dynamic RBAC administration privileges.',
     isSystemDefault: true,
-    permissions: MASTER_CATALOG_606_CODES,
+    permissions: [...MASTER_CATALOG_606_CODES, ...CFO_FINANCE_PERMISSION_CODES],
   },
 ]
 
@@ -911,6 +970,7 @@ export async function seedRbac(
     { code: 'kpis:read_squad_log', resource: 'kpis', action: 'read_squad_log', module: 'hr', name: 'Inspect Squad Members KPI & XP Logs', isCritical: false, isDelegable: true, isSensitive: false },
     { code: 'kpis:read_any_log', resource: 'kpis', action: 'read_any_log', module: 'hr', name: 'Inspect Any Employee KPI & XP Logs', isCritical: false, isDelegable: true, isSensitive: false },
     { code: 'xp:release_frozen', resource: 'xp', action: 'release_frozen', module: 'hr', name: 'Vote to Release Frozen Massive XP', isCritical: false, isDelegable: true, isSensitive: false },
+    ...CFO_FINANCE_PERMISSIONS,
   ]
   for (const ext of PHASE3_EXTENSIONS) {
     const record = await prisma.permission.upsert({

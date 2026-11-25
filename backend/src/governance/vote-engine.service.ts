@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import { PrismaService } from '../common/prisma.service'
 import { AuditLoggerService } from '../common/audit-logger.service'
 import { AuthenticatedUser } from '../common/auth-user.interface'
@@ -349,8 +350,20 @@ export class VoteEngineService {
 
     const now = new Date()
     if (status === 'approved') {
-      await this.prisma.$transaction([
-        this.prisma.budgetRequest.update({
+      await this.prisma.$transaction(async (tx) => {
+        const treasury =
+          tx.companyTreasury && typeof tx.companyTreasury.findUnique === 'function'
+            ? await tx.companyTreasury.findUnique({ where: { id: 'singleton' } })
+            : null
+
+        const requestedDecimal = new Prisma.Decimal(req.requestedAmount)
+        if (treasury && requestedDecimal.greaterThan(treasury.unallocatedReserves)) {
+          throw new BadRequestException(
+            `Insufficient unallocated treasury reserves to finalize budget request (available Tk ${new Prisma.Decimal(treasury.unallocatedReserves).toFixed(2)}, requested Tk ${requestedDecimal.toFixed(2)})`,
+          )
+        }
+
+        await tx.budgetRequest.update({
           where: { id: requestId },
           data: {
             status: 'approved',
@@ -359,23 +372,83 @@ export class VoteEngineService {
             reviewedAt: now,
             feedback,
           },
-        }),
-        this.prisma.project.update({
+        })
+
+        await tx.project.update({
           where: { id: req.projectId },
           data: {
             budget: { increment: req.requestedAmount },
           },
-        }),
-      ])
+        })
+
+        if (treasury && typeof tx.companyTreasury.update === 'function') {
+          await tx.companyTreasury.update({
+            where: { id: 'singleton' },
+            data: {
+              unallocatedReserves: { decrement: req.requestedAmount },
+              totalApprovedBudgets: { increment: req.requestedAmount },
+            },
+          })
+        }
+
+        await this.auditLogger.log(
+          {
+            actorId: reviewedById,
+            actorName: reviewedById,
+            actorEmail: '',
+            actorRole: 'EXECUTIVE_VOTE',
+            action: 'BUDGET_REQUEST_FINALIZED_APPROVED',
+            actionCode: 'budgets:approve_request',
+            severity: 'CRITICAL',
+            entityType: 'BudgetRequest',
+            entityId: req.id,
+            description: `Finalized approved budget increase of Tk ${requestedDecimal.toFixed(2)} for project ${req.project?.name || req.projectId}`,
+            category: 'FINANCE',
+            beforeState: treasury
+              ? {
+                  unallocatedReserves: String(treasury.unallocatedReserves),
+                  totalApprovedBudgets: String(treasury.totalApprovedBudgets),
+                }
+              : undefined,
+            afterState: {
+              approvedAmount: requestedDecimal.toFixed(2),
+              projectId: req.projectId,
+            },
+            reason: feedback,
+          },
+          tx,
+        )
+      })
     } else {
-      await this.prisma.budgetRequest.update({
-        where: { id: requestId },
-        data: {
-          status: 'rejected',
-          reviewedById,
-          reviewedAt: now,
-          feedback,
-        },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.budgetRequest.update({
+          where: { id: requestId },
+          data: {
+            status: 'rejected',
+            reviewedById,
+            reviewedAt: now,
+            feedback,
+          },
+        })
+
+        await this.auditLogger.log(
+          {
+            actorId: reviewedById,
+            actorName: reviewedById,
+            actorEmail: '',
+            actorRole: 'EXECUTIVE_VOTE',
+            action: 'BUDGET_REQUEST_FINALIZED_REJECTED',
+            actionCode: 'budgets:reject_request',
+            severity: 'WARNING',
+            entityType: 'BudgetRequest',
+            entityId: req.id,
+            description: `Finalized rejection of budget request for project ${req.project?.name || req.projectId}: ${feedback}`,
+            category: 'FINANCE',
+            afterState: { status: 'rejected', projectId: req.projectId },
+            reason: feedback,
+          },
+          tx,
+        )
       })
     }
   }

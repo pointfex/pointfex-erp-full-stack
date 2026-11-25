@@ -20,6 +20,8 @@ import {
 } from './dto/finance.dto'
 import { Prisma } from '@prisma/client'
 import { AuthenticatedUser } from '../common/auth-user.interface'
+import { AuditLoggerService } from '../common/audit-logger.service'
+import { findManagedTeamIds } from './finance-actor.util'
 
 @Injectable()
 export class FinanceService {
@@ -27,6 +29,7 @@ export class FinanceService {
     private prisma: PrismaService,
     @Optional() private readonly authz?: AuthorizationService,
     @Optional() private readonly sodValidator?: SodValidatorService,
+    @Optional() private readonly auditLogger?: AuditLoggerService,
   ) {}
 
   async getTreasury() {
@@ -147,6 +150,66 @@ export class FinanceService {
     const allocAmount = new Prisma.Decimal(dto.amount)
 
     return this.prisma.$transaction(async (tx) => {
+      if (
+        dto.idempotencyKey?.trim() &&
+        tx.financialTransaction &&
+        typeof tx.financialTransaction.findFirst === 'function'
+      ) {
+        const existing = await tx.financialTransaction.findFirst({
+          where: {
+            employeeId: dto.developerId,
+            projectId: dto.projectId,
+            type: 'budget_allocation',
+            reason: dto.idempotencyKey.trim(),
+          },
+        })
+        if (existing) {
+          const [proj, existingWallet] = await Promise.all([
+            tx.project.findUnique({ where: { id: dto.projectId } }),
+            tx.employeeWallet.findUnique({ where: { employeeId: dto.developerId } }),
+          ])
+          return {
+            project: proj,
+            wallet: existingWallet,
+            transaction: existing,
+            idempotentHit: true,
+          }
+        }
+      }
+
+      if (
+        actor.role?.toLowerCase() === 'pm' &&
+        typeof (tx as any).teamProject?.findFirst === 'function' &&
+        typeof (tx as any).teamMembership?.findFirst === 'function' &&
+        typeof (tx as any).positionAssignment?.findMany === 'function' &&
+        typeof (tx as any).team?.findMany === 'function'
+      ) {
+        const managedTeamIds = await findManagedTeamIds(tx, actor.id)
+        if (managedTeamIds.length === 0) {
+          throw new ForbiddenException('PM has no active managed squad for project allocation')
+        }
+        const teamProjectLink = await (tx as any).teamProject.findFirst({
+          where: { projectId: dto.projectId, teamId: { in: managedTeamIds } },
+        })
+        if (!teamProjectLink) {
+          throw new ForbiddenException(
+            'PM may only allocate developer budget within their own managed squad project',
+          )
+        }
+        const devMembership = await (tx as any).teamMembership.findFirst({
+          where: {
+            teamId: { in: managedTeamIds },
+            employeeId: dto.developerId,
+            isActive: true,
+          },
+        })
+        if (!devMembership) {
+          throw new ForbiddenException(
+            'PM may only allocate budget to active members of their managed squad',
+          )
+        }
+      }
+
       const project = await tx.project.findUnique({ where: { id: dto.projectId } })
       if (!project) throw new NotFoundException(`Project "${dto.projectId}" not found`)
 
@@ -224,12 +287,12 @@ export class FinanceService {
           description:
             dto.description || `Week ${dto.week || 3} sprint developer budget allocation`,
           status: 'allocated',
+          ...(dto.idempotencyKey?.trim() ? { reason: dto.idempotencyKey.trim() } : {}),
         },
       })
 
       // 5. Audit Log
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actor.id,
@@ -244,8 +307,22 @@ export class FinanceService {
           description: `Disbursed ৳${allocAmount.toNumber().toLocaleString()} to ${developer.name} for ${project.name}`,
           category: 'finance',
           badgeColor: 'emerald',
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actor.id,
+          actorEmail: actor.email || '',
+          actorRole: actor.role.toUpperCase(),
+          action: 'BUDGET_DISBURSED',
+          actionCode: 'BUDGET_DISBURSED',
+          severity: 'INFO',
+          entityType: 'project',
+          entityId: dto.projectId,
+          entityTitle: project.name,
+          description: `Disbursed ৳${allocAmount.toNumber().toLocaleString()} to ${developer.name} for ${project.name}`,
+          category: 'finance',
+          badgeColor: 'emerald',
+        } }))
 
       return {
         message: `Successfully allocated ৳${allocAmount.toNumber().toLocaleString()} to ${developer.name}`,
@@ -311,8 +388,7 @@ export class FinanceService {
       })
 
       // 4. Audit Log
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actor.id,
@@ -327,8 +403,22 @@ export class FinanceService {
           description: `Adjusted budget pool for ${project.name} to ৳${newBudgetDecimal.toNumber().toLocaleString()} (${delta.greaterThanOrEqualTo(0) ? '+' : ''}৳${delta.toNumber().toLocaleString()})`,
           category: 'finance',
           badgeColor: 'emerald',
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actor.id,
+          actorEmail: actor.email || '',
+          actorRole: actor.role.toUpperCase(),
+          action: 'PROJECT_BUDGET_ADJUSTED',
+          actionCode: 'CAPITAL_ALLOCATION_UPDATED',
+          severity: 'INFO',
+          entityType: 'project',
+          entityId: dto.projectId,
+          entityTitle: project.name,
+          description: `Adjusted budget pool for ${project.name} to ৳${newBudgetDecimal.toNumber().toLocaleString()} (${delta.greaterThanOrEqualTo(0) ? '+' : ''}৳${delta.toNumber().toLocaleString()})`,
+          category: 'finance',
+          badgeColor: 'emerald',
+        } }))
 
       return updatedProject
     })
@@ -353,8 +443,7 @@ export class FinanceService {
         include: { project: true },
       })
 
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actor.id,
@@ -369,8 +458,22 @@ export class FinanceService {
           description: `PM requested budget increase of ৳${requestedAmount.toNumber().toLocaleString()} for ${project.name}`,
           category: 'finance',
           badgeColor: 'amber',
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actor.id,
+          actorEmail: actor.email || '',
+          actorRole: actor.role.toUpperCase(),
+          action: 'BUDGET_REQUEST_LOGGED',
+          actionCode: 'BUDGET_REQUEST_LOGGED',
+          severity: 'INFO',
+          entityType: 'project',
+          entityId: dto.projectId,
+          entityTitle: project.name,
+          description: `PM requested budget increase of ৳${requestedAmount.toNumber().toLocaleString()} for ${project.name}`,
+          category: 'finance',
+          badgeColor: 'amber',
+        } }))
 
       return budgetReq
     })
@@ -441,8 +544,7 @@ export class FinanceService {
       })
 
       // 4. Audit Log
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actor.id,
@@ -457,8 +559,22 @@ export class FinanceService {
           description: `CFO approved +৳${approvedAmount.toNumber().toLocaleString()} budget increase for ${req.project.name}`,
           category: 'finance',
           badgeColor: 'emerald',
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actor.id,
+          actorEmail: actor.email || '',
+          actorRole: actor.role.toUpperCase(),
+          action: 'BUDGET_REQUEST_APPROVED',
+          actionCode: 'BUDGET_REQUEST_GRANTED',
+          severity: 'SUCCESS',
+          entityType: 'project',
+          entityId: req.projectId,
+          entityTitle: req.project.name,
+          description: `CFO approved +৳${approvedAmount.toNumber().toLocaleString()} budget increase for ${req.project.name}`,
+          category: 'finance',
+          badgeColor: 'emerald',
+        } }))
 
       return updatedReq
     })
@@ -472,6 +588,9 @@ export class FinanceService {
   ) {
     const req = await this.prisma.budgetRequest.findUnique({ where: { id: requestId } })
     if (!req) throw new NotFoundException(`Budget request "${requestId}" not found`)
+    if (req.requesterId === actor.id) {
+      throw new ForbiddenException('Requester cannot reject their own budget request')
+    }
     if (req.status && req.status !== 'pending') {
       throw new BadRequestException(`Budget request "${requestId}" has already been ${req.status}`)
     }
@@ -487,8 +606,7 @@ export class FinanceService {
         },
       })
 
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actor.id,
@@ -502,8 +620,21 @@ export class FinanceService {
           description: `CFO rejected budget request: "${dto.feedback}"`,
           category: 'finance',
           badgeColor: 'rose',
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actor.id,
+          actorEmail: actor.email || '',
+          actorRole: actor.role.toUpperCase(),
+          action: 'BUDGET_REQUEST_REJECTED',
+          actionCode: 'BUDGET_REQUEST_DENIED',
+          severity: 'WARNING',
+          entityType: 'project',
+          entityId: req.projectId,
+          description: `CFO rejected budget request: "${dto.feedback}"`,
+          category: 'finance',
+          badgeColor: 'rose',
+        } }))
 
       return updatedReq
     })
@@ -511,6 +642,9 @@ export class FinanceService {
 
   // Issue bonus or penalty
   async issueAdjustment(dto: IssueFinancialAdjustmentDto, actor: AuthenticatedUser) {
+    if (dto.userId === actor.id) {
+      throw new ForbiddenException('Cannot issue a financial adjustment to yourself')
+    }
     const amountDecimal = new Prisma.Decimal(dto.amount)
 
     return this.prisma.$transaction(async (tx) => {
@@ -589,8 +723,7 @@ export class FinanceService {
       })
 
       // Audit Log
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actor.id,
@@ -606,8 +739,23 @@ export class FinanceService {
           description: `${dto.type.toUpperCase()}: ৳${amountDecimal.toNumber().toLocaleString()} to ${user.name} (${dto.reason})`,
           category: 'finance',
           badgeColor: dto.type === 'bonus' ? 'emerald' : 'amber',
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actor.id,
+          actorEmail: actor.email || '',
+          actorRole: actor.role.toUpperCase(),
+          action: dto.type === 'bonus' ? 'BONUS_ISSUED' : 'PENALTY_ISSUED',
+          actionCode:
+            dto.type === 'bonus' ? 'PERFORMANCE_BONUS_DISBURSED' : 'DISCIPLINARY_DEDUCTION_APPLIED',
+          severity: dto.type === 'bonus' ? 'SUCCESS' : 'WARNING',
+          entityType: 'user',
+          entityId: dto.userId,
+          entityTitle: user.name,
+          description: `${dto.type.toUpperCase()}: ৳${amountDecimal.toNumber().toLocaleString()} to ${user.name} (${dto.reason})`,
+          category: 'finance',
+          badgeColor: dto.type === 'bonus' ? 'emerald' : 'amber',
+        } }))
 
       return {
         message: `Issued ৳${amountDecimal.toNumber().toLocaleString()} ${dto.type} to ${user.name}`,
@@ -726,8 +874,7 @@ export class FinanceService {
       })
 
       // 4. Audit Log
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actor.id,
@@ -742,8 +889,22 @@ export class FinanceService {
           description: `Disbursed ৳${totalRev.toNumber().toLocaleString()} client revenue: 50% to ${acquirer.name}, 50% to ${squadDevelopers.length} developers`,
           category: 'finance',
           badgeColor: 'emerald',
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actor.id,
+          actorEmail: actor.email || '',
+          actorRole: actor.role.toUpperCase(),
+          action: 'CLIENT_REVENUE_SHARED',
+          actionCode: 'REVENUE_SHARE_DISBURSED',
+          severity: 'SUCCESS',
+          entityType: 'project',
+          entityId: dto.projectId,
+          entityTitle: project.name,
+          description: `Disbursed ৳${totalRev.toNumber().toLocaleString()} client revenue: 50% to ${acquirer.name}, 50% to ${squadDevelopers.length} developers`,
+          category: 'finance',
+          badgeColor: 'emerald',
+        } }))
 
       return {
         message: `Client revenue share processed successfully for ${project.name}`,
@@ -783,10 +944,60 @@ export class FinanceService {
 
       const reverseAmount = new Prisma.Decimal(original.amount).negated()
       if (original.walletId) {
-        await tx.employeeWallet.update({
-          where: { id: original.walletId },
-          data: { balance: { increment: reverseAmount } },
-        })
+        const wallet =
+          tx.employeeWallet && typeof tx.employeeWallet.findUnique === 'function'
+            ? await tx.employeeWallet.findUnique({ where: { id: original.walletId } })
+            : null
+        if (wallet) {
+          const currentBalance = new Prisma.Decimal(wallet.balance)
+          const nextBalance = currentBalance.plus(reverseAmount)
+          if (nextBalance.lessThan(0)) {
+            throw new BadRequestException(
+              `Reversal blocked: personal wallet balance (Tk ${currentBalance.toFixed(2)}) would become negative`,
+            )
+          }
+
+          const origAbs = new Prisma.Decimal(original.amount).abs()
+          const walletUpdate: Prisma.EmployeeWalletUpdateInput = {
+            balance: nextBalance,
+          }
+          if (original.type === 'bonus') {
+            walletUpdate.totalEarnedToDate = Prisma.Decimal.max(
+              new Prisma.Decimal(0),
+              new Prisma.Decimal(wallet.totalEarnedToDate ?? 0).minus(origAbs),
+            )
+            walletUpdate.sprintBonusEarned = Prisma.Decimal.max(
+              new Prisma.Decimal(0),
+              new Prisma.Decimal(wallet.sprintBonusEarned ?? 0).minus(origAbs),
+            )
+          } else if (original.type === 'penalty' || original.type === 'deduction') {
+            walletUpdate.totalPenalties = Prisma.Decimal.max(
+              new Prisma.Decimal(0),
+              new Prisma.Decimal(wallet.totalPenalties ?? 0).minus(origAbs),
+            )
+          } else if (
+            original.type === 'budget_allocation' ||
+            original.type === 'milestone_payout' ||
+            original.type === 'client_revenue_share'
+          ) {
+            walletUpdate.totalEarnedToDate = Prisma.Decimal.max(
+              new Prisma.Decimal(0),
+              new Prisma.Decimal(wallet.totalEarnedToDate ?? 0).minus(origAbs),
+            )
+          }
+
+          await tx.employeeWallet.update({
+            where: { id: original.walletId },
+            data: walletUpdate,
+          })
+        } else if (!tx.employeeWallet || typeof tx.employeeWallet.findUnique !== 'function') {
+          await tx.employeeWallet.update({
+            where: { id: original.walletId },
+            data: { balance: { increment: reverseAmount } },
+          })
+        } else {
+          throw new NotFoundException(`Wallet "${original.walletId}" not found for reversal`)
+        }
       }
 
       const reversalTx = await tx.financialTransaction.create({
@@ -803,6 +1014,30 @@ export class FinanceService {
           reversalOfId: original.id,
         },
       })
+
+      await this.auditLogger?.log(
+        {
+          actorId: actor.id,
+          actorName: actor.name || actor.email || actor.id,
+          actorEmail: actor.email || '',
+          actorRole: (actor.role || 'cfo').toUpperCase(),
+          action: 'FINANCIAL_TRANSACTION_REVERSED',
+          actionCode: 'transactions:reverse',
+          severity: 'WARNING',
+          entityType: 'FinancialTransaction',
+          entityId: reversalTx.id,
+          description: `Reversed transaction [${original.id}] (${original.type}): ${reason.trim()}`,
+          category: 'FINANCE',
+          afterState: {
+            originalTransactionId: original.id,
+            reversalTransactionId: reversalTx.id,
+            reverseAmount: reverseAmount.toFixed(2),
+          },
+          reason: reason.trim(),
+          mfaVerified: true,
+        },
+        tx,
+      )
 
       return { reversed: true, originalTransactionId: original.id, reversalTransaction: reversalTx }
     })

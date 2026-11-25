@@ -650,3 +650,382 @@ export function mapBackendBundleToSeedData(
     treasury,
   }
 }
+
+export interface FinanceV2Account {
+  id: string
+  code: string
+  name: string
+  type: 'COMPANY_FUND' | 'SQUAD'
+  teamId: string | null
+  teamName?: string
+  teamCode?: string
+  balance: number
+  currency: string
+  isActive: boolean
+}
+
+export interface FinanceV2Config {
+  id: string
+  payrollRateBDT: number
+  commissionRatePct: number
+  sprintPoolTotalBDT: number
+  squadOpeningSeedBDT: number
+  executivePayrollRoles: string[]
+  rankWeights: number[]
+  bonusTiers: Array<{
+    minScore: number
+    maxScore: number
+    amount: string
+    label: string
+  }>
+  penaltyTable: Record<
+    string,
+    {
+      amount: string
+      recipientRole: string | null
+      recipientPct: string
+      companyPct: string
+      requiresCeoApproval?: boolean
+      triggersRosterChange?: boolean
+    }
+  >
+  updatedById?: string | null
+}
+
+export interface FinanceV2LedgerTx {
+  id: string
+  referenceNo: string
+  idempotencyKey: string
+  sprintNumber: number
+  type: string
+  sourceKind: string
+  sourceRefId: string
+  destKind: string
+  destRefId: string
+  grossAmount: number
+  deductions: number
+  netAmount: number
+  teamId: string | null
+  employeeId: string | null
+  reason: string
+  createdById: string
+  approvedById: string | null
+  approvedAt: string | null
+  approvalRef: string | null
+  status: string
+  reversalOfId: string | null
+  reversedBy: { id: string; referenceNo: string; createdAt: string } | null
+  direction?: 'CREDIT' | 'DEBIT'
+  runningBalance?: number
+  createdAt: string
+}
+
+export interface FinanceV2AccountStatement {
+  account: FinanceV2Account
+  openingBalance: number
+  totalCredits: number
+  totalDebits: number
+  closingBalance: number
+  currentAccountBalance: number
+  entries: FinanceV2LedgerTx[]
+}
+
+export interface FinanceV2MoneyRequest {
+  id: string
+  type: 'ADD_MONEY' | 'POOL_CREDIT' | 'TRANSFER'
+  sprintNumber: number
+  sourceKind: string
+  sourceRefId: string
+  destKind: string
+  destRefId: string
+  teamId: string | null
+  amount: number
+  reason: string
+  purpose: string | null
+  status: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'PAID'
+  requesterId: string
+  approvedById: string | null
+  rejectionReason: string | null
+  postedById: string | null
+  ledgerTransactionId: string | null
+  createdAt: string
+}
+
+export interface FinanceV2SprintRanking {
+  id: string
+  sprintNumber: number
+  entries: Array<{ teamId: string; rank: number }>
+  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'
+  submittedById: string
+  approvedById: string | null
+  rejectionReason: string | null
+  poolPostedAt: string | null
+  createdAt: string
+}
+
+export interface FinanceV2PayrollRun {
+  id: string
+  sprintNumber: number
+  kind: 'EXECUTIVE' | 'SQUAD'
+  teamId: string | null
+  scopeKey: string
+  status: 'DRAFT' | 'CONFIRMED' | 'PAID'
+  ratePerPerson: number
+  headcount: number
+  totalAmount: number
+  rosterSnapshot: {
+    teamName?: string
+    members?: Array<{ employeeId: string; employeeName?: string; roleInRun: string }>
+    slots?: Array<{ employeeId: string; employeeName?: string; roleSlug: string }>
+    pendingRosterChanges?: Array<{ penaltyId: string; category: string; reason: string }>
+  }
+  rosterChangeFlagConsumed: boolean
+  confirmedById: string | null
+  executedById: string | null
+  createdAt: string
+}
+
+export interface FinanceV2BonusAward {
+  id: string
+  sprintNumber: number
+  teamId: string
+  employeeId: string
+  criteriaScores: Record<string, number>
+  totalScore: number
+  evidence: string
+  tierAmount: number
+  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'PAID'
+  scoredById: string
+  approvedById: string | null
+  rejectionReason: string | null
+  disbursedById: string | null
+  createdAt: string
+}
+
+export interface FinanceV2PenaltyRecord {
+  id: string
+  sprintNumber: number
+  teamId: string
+  category: string
+  grossAmount: number
+  recipientEmployeeId: string | null
+  recipientShare: number
+  companyFundShare: number
+  reason: string
+  status: 'RECORDED' | 'PENDING_CEO_APPROVAL' | 'APPROVED' | 'REJECTED' | 'POSTED'
+  recordedById: string
+  approvedById: string | null
+  rejectionReason: string | null
+  postedById: string | null
+  triggersRosterChange: boolean
+  rosterChangeConsumedByRunId: string | null
+  createdAt: string
+}
+
+export interface FinanceV2CommissionRecord {
+  id: string
+  sprintNumber: number
+  poolBaseAmount: number
+  ratePct: number
+  amount: number
+  cfoEmployeeId: string
+  postedById: string
+  ledgerTransactionId: string
+  createdAt: string
+}
+
+export interface FinanceV2SprintLock {
+  id: string
+  sprintNumber: number
+  status: 'OPEN' | 'PENDING_APPROVAL' | 'LOCKED'
+  requestedById: string | null
+  approvedById: string | null
+  reason: string | null
+  createdAt: string
+}
+
+export function mapFinanceV2Config(raw: any): FinanceV2Config {
+  return {
+    id: raw?.id || 'singleton',
+    payrollRateBDT: Number(raw?.payrollRateBDT ?? 2500),
+    commissionRatePct: Number(raw?.commissionRatePct ?? 5),
+    sprintPoolTotalBDT: Number(raw?.sprintPoolTotalBDT ?? 150000),
+    squadOpeningSeedBDT: Number(raw?.squadOpeningSeedBDT ?? 100000),
+    executivePayrollRoles: Array.isArray(raw?.executivePayrollRoles)
+      ? raw.executivePayrollRoles
+      : ['cto', 'cpo', 'cfo', 'chro'],
+    rankWeights: Array.isArray(raw?.rankWeights) ? raw.rankWeights : [6, 5, 4, 3, 2, 1],
+    bonusTiers: Array.isArray(raw?.bonusTiers) ? raw.bonusTiers : [],
+    penaltyTable: raw?.penaltyTable && typeof raw.penaltyTable === 'object' ? raw.penaltyTable : {},
+    updatedById: raw?.updatedById ?? null,
+  }
+}
+
+export function mapFinanceV2Account(raw: any): FinanceV2Account {
+  return {
+    id: raw.id,
+    code: raw.code,
+    name: raw.name,
+    type: raw.type,
+    teamId: raw.teamId ?? null,
+    teamName: raw.team?.name,
+    teamCode: raw.team?.code,
+    balance: Number(raw.balance ?? 0),
+    currency: raw.currency || 'BDT',
+    isActive: Boolean(raw.isActive ?? true),
+  }
+}
+
+export function mapFinanceV2LedgerTx(raw: any): FinanceV2LedgerTx {
+  return {
+    id: raw.id,
+    referenceNo: raw.referenceNo,
+    idempotencyKey: raw.idempotencyKey,
+    sprintNumber: Number(raw.sprintNumber ?? 1),
+    type: raw.type,
+    sourceKind: raw.sourceKind,
+    sourceRefId: raw.sourceRefId,
+    destKind: raw.destKind,
+    destRefId: raw.destRefId,
+    grossAmount: Number(raw.grossAmount ?? 0),
+    deductions: Number(raw.deductions ?? 0),
+    netAmount: Number(raw.netAmount ?? 0),
+    teamId: raw.teamId ?? null,
+    employeeId: raw.employeeId ?? null,
+    reason: raw.reason || '',
+    createdById: raw.createdById,
+    approvedById: raw.approvedById ?? null,
+    approvedAt: raw.approvedAt ?? null,
+    approvalRef: raw.approvalRef ?? null,
+    status: raw.status || 'PAID',
+    reversalOfId: raw.reversalOfId ?? null,
+    reversedBy: raw.reversedBy ?? null,
+    direction: raw.direction,
+    runningBalance:
+      raw.runningBalance !== undefined ? Number(raw.runningBalance) : undefined,
+    createdAt: raw.createdAt,
+  }
+}
+
+export function mapFinanceV2MoneyRequest(raw: any): FinanceV2MoneyRequest {
+  return {
+    id: raw.id,
+    type: raw.type,
+    sprintNumber: Number(raw.sprintNumber ?? 1),
+    sourceKind: raw.sourceKind,
+    sourceRefId: raw.sourceRefId,
+    destKind: raw.destKind,
+    destRefId: raw.destRefId,
+    teamId: raw.teamId ?? null,
+    amount: Number(raw.amount ?? 0),
+    reason: raw.reason || '',
+    purpose: raw.purpose ?? null,
+    status: raw.status,
+    requesterId: raw.requesterId,
+    approvedById: raw.approvedById ?? null,
+    rejectionReason: raw.rejectionReason ?? null,
+    postedById: raw.postedById ?? null,
+    ledgerTransactionId: raw.ledgerTransactionId ?? null,
+    createdAt: raw.createdAt,
+  }
+}
+
+export function mapFinanceV2SprintRanking(raw: any): FinanceV2SprintRanking {
+  return {
+    id: raw.id,
+    sprintNumber: Number(raw.sprintNumber ?? 1),
+    entries: Array.isArray(raw.entries) ? raw.entries : [],
+    status: raw.status,
+    submittedById: raw.submittedById,
+    approvedById: raw.approvedById ?? null,
+    rejectionReason: raw.rejectionReason ?? null,
+    poolPostedAt: raw.poolPostedAt ?? null,
+    createdAt: raw.createdAt,
+  }
+}
+
+export function mapFinanceV2PayrollRun(raw: any): FinanceV2PayrollRun {
+  return {
+    id: raw.id,
+    sprintNumber: Number(raw.sprintNumber ?? 1),
+    kind: raw.kind,
+    teamId: raw.teamId ?? null,
+    scopeKey: raw.scopeKey,
+    status: raw.status,
+    ratePerPerson: Number(raw.ratePerPerson ?? 0),
+    headcount: Number(raw.headcount ?? 0),
+    totalAmount: Number(raw.totalAmount ?? 0),
+    rosterSnapshot: raw.rosterSnapshot || {},
+    rosterChangeFlagConsumed: Boolean(raw.rosterChangeFlagConsumed),
+    confirmedById: raw.confirmedById ?? null,
+    executedById: raw.executedById ?? null,
+    createdAt: raw.createdAt,
+  }
+}
+
+export function mapFinanceV2BonusAward(raw: any): FinanceV2BonusAward {
+  return {
+    id: raw.id,
+    sprintNumber: Number(raw.sprintNumber ?? 1),
+    teamId: raw.teamId,
+    employeeId: raw.employeeId,
+    criteriaScores: raw.criteriaScores || {},
+    totalScore: Number(raw.totalScore ?? 0),
+    evidence: raw.evidence || '',
+    tierAmount: Number(raw.tierAmount ?? 0),
+    status: raw.status,
+    scoredById: raw.scoredById,
+    approvedById: raw.approvedById ?? null,
+    rejectionReason: raw.rejectionReason ?? null,
+    disbursedById: raw.disbursedById ?? null,
+    createdAt: raw.createdAt,
+  }
+}
+
+export function mapFinanceV2PenaltyRecord(raw: any): FinanceV2PenaltyRecord {
+  return {
+    id: raw.id,
+    sprintNumber: Number(raw.sprintNumber ?? 1),
+    teamId: raw.teamId,
+    category: raw.category,
+    grossAmount: Number(raw.grossAmount ?? 0),
+    recipientEmployeeId: raw.recipientEmployeeId ?? null,
+    recipientShare: Number(raw.recipientShare ?? 0),
+    companyFundShare: Number(raw.companyFundShare ?? 0),
+    reason: raw.reason || '',
+    status: raw.status,
+    recordedById: raw.recordedById,
+    approvedById: raw.approvedById ?? null,
+    rejectionReason: raw.rejectionReason ?? null,
+    postedById: raw.postedById ?? null,
+    triggersRosterChange: Boolean(raw.triggersRosterChange),
+    rosterChangeConsumedByRunId: raw.rosterChangeConsumedByRunId ?? null,
+    createdAt: raw.createdAt,
+  }
+}
+
+export function mapFinanceV2CommissionRecord(raw: any): FinanceV2CommissionRecord {
+  return {
+    id: raw.id,
+    sprintNumber: Number(raw.sprintNumber ?? 1),
+    poolBaseAmount: Number(raw.poolBaseAmount ?? 0),
+    ratePct: Number(raw.ratePct ?? 0),
+    amount: Number(raw.amount ?? 0),
+    cfoEmployeeId: raw.cfoEmployeeId,
+    postedById: raw.postedById,
+    ledgerTransactionId: raw.ledgerTransactionId,
+    createdAt: raw.createdAt,
+  }
+}
+
+export function mapFinanceV2SprintLock(raw: any): FinanceV2SprintLock {
+  return {
+    id: raw.id,
+    sprintNumber: Number(raw.sprintNumber ?? 1),
+    status: raw.status,
+    requestedById: raw.requestedById ?? null,
+    approvedById: raw.approvedById ?? null,
+    reason: raw.reason ?? null,
+    createdAt: raw.createdAt,
+  }
+}

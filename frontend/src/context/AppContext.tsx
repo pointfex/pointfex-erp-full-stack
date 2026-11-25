@@ -1955,9 +1955,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
 
   const handleApproveBudgetRequest = useCallback(
-    (reportId: string, approvedAmount: number, feedback?: string) => {
+    (reportId: string, approvedAmount: number, feedback?: string, mfaCode?: string) => {
       void runApiMutation(
-        () => erpApi.approveBudgetRequest(reportId, { approvedAmount, feedback }),
+        () => erpApi.approveBudgetRequest(reportId, { approvedAmount, feedback }, mfaCode),
         `Approved +${formatBDT(approvedAmount)} budget increase`,
       )
     },
@@ -1965,9 +1965,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
 
   const handleRejectBudgetRequest = useCallback(
-    (reportId: string, feedback: string) => {
+    (reportId: string, feedback: string, mfaCode?: string) => {
       void runApiMutation(
-        () => erpApi.rejectBudgetRequest(reportId, feedback || 'Budget request dismissed by CFO.'),
+        () => erpApi.rejectBudgetRequest(reportId, feedback || 'Budget request dismissed by CFO.', mfaCode),
         'Budget request dismissed',
       )
     },
@@ -1975,10 +1975,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   )
 
   const handleIssueFinancialAdjustment = useCallback(
-    (userId: string, amount: number, type: 'bonus' | 'penalty', reason: string) => {
+    (userId: string, amount: number, type: 'bonus' | 'penalty', reason: string, mfaCode?: string) => {
       const targetUser = data.users.find((u) => u.id === userId)
       void runApiMutation(
-        () => erpApi.issueFinancialAdjustment({ userId, amount, type, reason }),
+        () => erpApi.issueFinancialAdjustment({ userId, amount, type, reason }, mfaCode),
         `Issued ${formatBDT(amount)} ${type} to ${targetUser?.name || userId}`,
       )
     },
