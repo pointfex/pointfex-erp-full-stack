@@ -7,6 +7,7 @@ import {
   OnModuleInit,
   Optional,
 } from '@nestjs/common'
+import { AuditLoggerService } from '../common/audit-logger.service'
 import { PrismaService } from '../common/prisma.service'
 import { PermissionCacheService } from '../rbac/permission-cache.service'
 import { AuthorizationService } from '../rbac/authorization.service'
@@ -39,6 +40,7 @@ export class GovernanceService implements OnModuleInit {
     @Optional() private cache?: PermissionCacheService,
     @Optional() private readonly authz?: AuthorizationService,
     @Optional() private readonly voteEngine?: VoteEngineService,
+    @Optional() private readonly auditLogger?: AuditLoggerService,
   ) {}
 
   async onModuleInit() {
@@ -95,8 +97,7 @@ export class GovernanceService implements OnModuleInit {
           },
         })
 
-        await this.prisma.auditLog.create({
-          data: {
+        await (this.auditLogger ? this.auditLogger.log({
             actorId: req.requesterId,
             actorName: req.requester?.name || 'Chief Executive Officer',
             actorEmail: req.requester?.email || '',
@@ -115,8 +116,26 @@ export class GovernanceService implements OnModuleInit {
               requestedRoleSlug: req.requestedRole?.slug,
               reason: 'cancelled: superseded by direct CEO action',
             },
-          },
-        })
+          } as any) : this.prisma.auditLog.create({ data: {
+            actorId: req.requesterId,
+            actorName: req.requester?.name || 'Chief Executive Officer',
+            actorEmail: req.requester?.email || '',
+            actorRole: 'CEO',
+            action: 'ACCESS_REQUEST_CANCELLED',
+            actionCode: 'SUPERSEDED_BY_DIRECT_CEO_ACTION',
+            severity: 'INFO',
+            entityType: 'user',
+            entityId: req.targetEmployeeId,
+            entityTitle: req.targetEmployee?.name || 'Employee',
+            description: `Pending request for "${req.requestedRole?.name}" for ${req.targetEmployee?.name} marked "cancelled: superseded by direct CEO action".`,
+            category: 'governance',
+            badgeColor: 'gray',
+            payload: {
+              requestId: req.id,
+              requestedRoleSlug: req.requestedRole?.slug,
+              reason: 'cancelled: superseded by direct CEO action',
+            },
+          } }))
       }
     } catch {
       // ignore startup errors on unmigrated db
@@ -201,8 +220,7 @@ export class GovernanceService implements OnModuleInit {
       })
 
       // Audit Log
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actor.id,
@@ -217,8 +235,22 @@ export class GovernanceService implements OnModuleInit {
           description: `Dispatched strategic directive to ${dto.assigneeRole.toUpperCase()}: "${dto.title}"`,
           category: 'governance',
           badgeColor: 'sky',
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actor.id,
+          actorEmail: actor.email || '',
+          actorRole: actor.role.toUpperCase(),
+          action: 'EXECUTIVE_DIRECTIVE_ISSUED',
+          actionCode: 'EXECUTIVE_DIRECTIVE_DISPATCHED',
+          severity: 'INFO',
+          entityType: 'task',
+          entityId: taskId,
+          entityTitle: dto.title,
+          description: `Dispatched strategic directive to ${dto.assigneeRole.toUpperCase()}: "${dto.title}"`,
+          category: 'governance',
+          badgeColor: 'sky',
+        } }))
 
       return directive
     })
@@ -238,8 +270,7 @@ export class GovernanceService implements OnModuleInit {
         },
       })
 
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actor.id,
@@ -253,8 +284,21 @@ export class GovernanceService implements OnModuleInit {
           description: `CEO formally ratified ${dto.actionType.replace(/_/g, ' ')}${dto.notes ? `: ${dto.notes}` : ''}`,
           category: 'governance',
           badgeColor: 'emerald',
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actor.id,
+          actorEmail: actor.email || '',
+          actorRole: actor.role.toUpperCase(),
+          action: 'CEO_DECISION_RATIFIED',
+          actionCode: 'CEO_DECISION_AUTHORIZED',
+          severity: 'SUCCESS',
+          entityType: 'governance',
+          entityId: dto.entityId,
+          description: `CEO formally ratified ${dto.actionType.replace(/_/g, ' ')}${dto.notes ? `: ${dto.notes}` : ''}`,
+          category: 'governance',
+          badgeColor: 'emerald',
+        } }))
 
       return decision
     })
@@ -369,8 +413,7 @@ export class GovernanceService implements OnModuleInit {
           },
         })
 
-        await tx.auditLog.create({
-          data: {
+        await (this.auditLogger ? this.auditLogger.log({
             ipAddress: getCurrentRequestIp(),
             actorId: actor.id,
             actorName: actorEmployee.name,
@@ -387,8 +430,24 @@ export class GovernanceService implements OnModuleInit {
             badgeColor: 'emerald',
             outcome: 'APPLIED_IMMEDIATELY',
             mfaVerified: true,
-          },
-        })
+          } as any, tx) : tx.auditLog.create({ data: {
+            ipAddress: getCurrentRequestIp(),
+            actorId: actor.id,
+            actorName: actorEmployee.name,
+            actorEmail: actorEmployee.email,
+            actorRole: 'CEO',
+            action: 'ROLE_ASSIGNED_DIRECT_CEO',
+            actionCode: 'CEO_DIRECT_APPLY',
+            severity: 'INFO',
+            entityType: 'user',
+            entityId: dto.targetEmployeeId,
+            entityTitle: targetEmployee.name,
+            description: `CEO assigned role "${role.name}" to ${targetEmployee.name} — takes effect immediately.`,
+            category: 'governance',
+            badgeColor: 'emerald',
+            outcome: 'APPLIED_IMMEDIATELY',
+            mfaVerified: true,
+          } }))
       })
 
       await this.cache?.invalidateUsers([dto.targetEmployeeId])
@@ -453,8 +512,7 @@ export class GovernanceService implements OnModuleInit {
         },
       })
 
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actorEmployee.name,
@@ -474,8 +532,27 @@ export class GovernanceService implements OnModuleInit {
             requestedRoleSlug: role.slug,
             reason: dto.reason?.trim() || null,
           },
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actorEmployee.name,
+          actorEmail: actorEmployee.email,
+          actorRole: actor.role.toUpperCase(),
+          action: 'ACCESS_CHANGE_REQUESTED',
+          actionCode: 'MAKER_CHECKER_REQUEST_CREATED',
+          severity: 'WARNING',
+          entityType: 'user',
+          entityId: dto.targetEmployeeId,
+          entityTitle: targetEmployee.name,
+          description: `${actorEmployee.name} requested role change to "${role.name}" for ${targetEmployee.name} — Pending CEO approval`,
+          category: 'governance',
+          badgeColor: 'amber',
+          payload: {
+            requestId: request.id,
+            requestedRoleSlug: role.slug,
+            reason: dto.reason?.trim() || null,
+          },
+        } }))
 
       return request
     })
@@ -612,8 +689,7 @@ export class GovernanceService implements OnModuleInit {
         },
       })
 
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actorEmployee.name,
@@ -634,8 +710,28 @@ export class GovernanceService implements OnModuleInit {
             requesterId: request.requesterId,
             reviewNotes: dto?.reviewNotes?.trim() || null,
           },
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actorEmployee.name,
+          actorEmail: actorEmployee.email,
+          actorRole: actor.role.toUpperCase(),
+          action: 'ACCESS_CHANGE_APPROVED',
+          actionCode: 'MAKER_CHECKER_REQUEST_APPROVED',
+          severity: 'SUCCESS',
+          entityType: 'user',
+          entityId: request.targetEmployeeId,
+          entityTitle: targetEmployee.name,
+          description: `${actorEmployee.name} approved role change to "${request.requestedRole.name}" for ${targetEmployee.name}`,
+          category: 'governance',
+          badgeColor: 'emerald',
+          payload: {
+            requestId: request.id,
+            requestedRoleSlug: request.requestedRole.slug,
+            requesterId: request.requesterId,
+            reviewNotes: dto?.reviewNotes?.trim() || null,
+          },
+        } }))
 
       return updatedReq
     })
@@ -703,8 +799,7 @@ export class GovernanceService implements OnModuleInit {
         },
       })
 
-      await tx.auditLog.create({
-        data: {
+      await (this.auditLogger ? this.auditLogger.log({
           ipAddress: getCurrentRequestIp(),
           actorId: actor.id,
           actorName: actorEmployee.name,
@@ -719,8 +814,22 @@ export class GovernanceService implements OnModuleInit {
           description: `${actorEmployee.name} rejected role change to "${request.requestedRole.name}" for ${targetEmployee.name}${dto?.reviewNotes?.trim() ? ` — Notes: ${dto.reviewNotes.trim()}` : ''}`,
           category: 'governance',
           badgeColor: 'rose',
-        },
-      })
+        } as any, tx) : tx.auditLog.create({ data: {
+          ipAddress: getCurrentRequestIp(),
+          actorId: actor.id,
+          actorName: actorEmployee.name,
+          actorEmail: actorEmployee.email,
+          actorRole: actor.role.toUpperCase(),
+          action: 'ACCESS_CHANGE_REJECTED',
+          actionCode: 'MAKER_CHECKER_REQUEST_REJECTED',
+          severity: 'WARNING',
+          entityType: 'user',
+          entityId: request.targetEmployeeId,
+          entityTitle: targetEmployee.name,
+          description: `${actorEmployee.name} rejected role change to "${request.requestedRole.name}" for ${targetEmployee.name}${dto?.reviewNotes?.trim() ? ` — Notes: ${dto.reviewNotes.trim()}` : ''}`,
+          category: 'governance',
+          badgeColor: 'rose',
+        } }))
 
       return updated
     })

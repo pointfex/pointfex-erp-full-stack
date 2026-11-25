@@ -22,6 +22,7 @@ export interface AuditEntryInput {
   badgeColor?: string | null
   ipAddress?: string | null
   userAgent?: string | null
+  device?: string | null
   sessionId?: string | null
   beforeState?: Prisma.InputJsonValue
   afterState?: Prisma.InputJsonValue
@@ -133,6 +134,9 @@ export class AuditLoggerService {
         ...(entry.beforeState !== undefined ? { beforeState: entry.beforeState } : {}),
         ...(entry.afterState !== undefined ? { afterState: entry.afterState } : {}),
         ...(entry.approvalChain !== undefined ? { approvalChain: entry.approvalChain } : {}),
+        ...(entry.device !== undefined ? { device: entry.device } : {}),
+        ...(entry.actionKey !== undefined ? { actionKey: entry.actionKey } : {}),
+        ...(entry.mfaVerified !== undefined ? { mfaVerified: entry.mfaVerified } : {}),
         ...(entry.payload !== undefined ? { payload: entry.payload } : {}),
       },
     })

@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 
 const APPEND_ONLY_SQL_RE =
-  /\b(TRUNCATE|DROP\s+(TABLE|TRIGGER|FUNCTION)|ALTER\s+TABLE|DELETE\s+FROM|UPDATE)\b[\s\S]*\b(audit_logs|financial_transactions|xp_ledger_entries|kpi_xp_audit_logs)\b/i
+  /\b(TRUNCATE|DROP\s+(TABLE|TRIGGER|FUNCTION)|ALTER\s+TABLE|DELETE\s+FROM|UPDATE)\b[\s\S]*\b(audit_logs|financial_transactions|ledger_transactions|xp_ledger_entries|kpi_xp_audit_logs)\b/i
 const BLOCKED_MUTATION_OPS = new Set(['update', 'updateMany', 'upsert', 'delete', 'deleteMany'])
 
 function assertSafeRawSql(sqlText: string): void {
@@ -19,7 +19,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     super()
 
     const wrapDelegate = (
-      modelKey: 'auditLog' | 'financialTransaction' | 'xpLedgerEntry' | 'kpiXpAuditLog',
+      modelKey: 'auditLog' | 'financialTransaction' | 'ledgerTransaction' | 'xpLedgerEntry' | 'kpiXpAuditLog',
     ) => {
       const delegate = (this as any)[modelKey]
       if (!delegate) return
@@ -39,6 +39,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     wrapDelegate('auditLog')
     wrapDelegate('financialTransaction')
+    wrapDelegate('ledgerTransaction')
     wrapDelegate('xpLedgerEntry')
     wrapDelegate('kpiXpAuditLog')
 

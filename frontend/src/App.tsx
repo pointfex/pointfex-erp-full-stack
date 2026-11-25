@@ -279,6 +279,11 @@ function MainContentRouter() {
       'budgets:allocate_project',
       'finance:issue_adjustment',
       'revenue_share:process',
+      'performance:evaluate',
+      'finance_ledger:read_all',
+      'money_requests:create',
+      'money_requests:approve',
+      'money_requests:post',
     ])
   ) {
     return <CfoBudgetPage />

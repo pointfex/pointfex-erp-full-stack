@@ -166,6 +166,7 @@ model Team {
   reports      Report[]
   consultancies ConsultancyRequest[]
   resources    TeamResource[]
+  financeAccount FinanceAccount?
 
   @@map("teams")
 }
@@ -1986,6 +1987,336 @@ model PasswordHistory {
   @@index([employeeId])
   @@index([createdAt])
   @@map("password_histories")
+}
+
+// --------------------------------------------------------------------------
+// 15. CFO TREASURY, DOUBLE-ENTRY LEDGER, PAYROLL, BONUS, PENALTY & COMMISSION
+// --------------------------------------------------------------------------
+
+enum FinanceAccountType {
+  COMPANY_FUND
+  SQUAD
+}
+
+enum LedgerRefKind {
+  FINANCE_ACCOUNT
+  PERSONAL_WALLET
+  EXTERNAL
+}
+
+enum LedgerTxStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PAID
+  REJECTED
+  REVERSED
+}
+
+enum LedgerTxType {
+  ADD_MONEY
+  POOL_CREDIT
+  TRANSFER
+  EXECUTIVE_PAYROLL
+  SQUAD_PAYROLL
+  BONUS_AWARD
+  PENALTY_SPLIT
+  PENALTY_RESIDUAL
+  CFO_COMMISSION
+  REVERSAL
+}
+
+enum MoneyRequestType {
+  ADD_MONEY
+  POOL_CREDIT
+  TRANSFER
+}
+
+enum MoneyRequestStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum PayrollRunKind {
+  EXECUTIVE
+  SQUAD
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  CONFIRMED
+  PAID
+}
+
+enum BonusAwardStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum PenaltyCategory {
+  CODE_SMELL
+  CTO_CONSULTANCY
+  SLACKER
+  SWAP_FIRE
+  DEADLINE
+  BLIND_QA
+}
+
+enum PenaltyStatus {
+  RECORDED
+  PENDING_CEO_APPROVAL
+  APPROVED
+  REJECTED
+  POSTED
+}
+
+enum SprintRankingStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum SprintLockStatus {
+  OPEN
+  PENDING_APPROVAL
+  LOCKED
+}
+
+model FinanceConfig {
+  id                    String   @id @default("singleton")
+  payrollRateBDT        Decimal  @default(2500) @db.Decimal(14, 2)
+  commissionRatePct     Decimal  @default(5) @db.Decimal(5, 2)
+  sprintPoolTotalBDT    Decimal  @default(150000) @db.Decimal(14, 2)
+  squadOpeningSeedBDT   Decimal  @default(100000) @db.Decimal(14, 2)
+  executivePayrollRoles String[] @default(["cto", "cpo", "cfo", "chro"])
+  rankWeights           Json
+  bonusTiers            Json
+  penaltyTable          Json
+  updatedById           String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("finance_configs")
+}
+
+model FinanceAccount {
+  id        String             @id @default(cuid())
+  code      String             @unique
+  name      String
+  type      FinanceAccountType
+  teamId    String?            @unique
+  balance   Decimal            @default(0) @db.Decimal(14, 2)
+  currency  String             @default("BDT")
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  team Team? @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
+  @@index([type])
+  @@map("finance_accounts")
+}
+
+model LedgerTransaction {
+  id             String         @id @default(cuid())
+  referenceNo    String         @unique
+  idempotencyKey String         @unique
+  sprintNumber   Int
+  type           LedgerTxType
+  sourceKind     LedgerRefKind
+  sourceRefId    String
+  destKind       LedgerRefKind
+  destRefId      String
+  grossAmount    Decimal        @db.Decimal(14, 2)
+  deductions     Decimal        @default(0) @db.Decimal(14, 2)
+  netAmount      Decimal        @db.Decimal(14, 2)
+  teamId         String?
+  employeeId     String?
+  reason         String
+  createdById    String
+  approvedById   String?
+  approvedAt     DateTime?
+  approvalRef    String?
+  status         LedgerTxStatus @default(PAID)
+  reversalOfId   String?        @unique
+  metadata       Json?
+  createdAt      DateTime       @default(now())
+
+  reversalOf LedgerTransaction?  @relation("LedgerTxReversal", fields: [reversalOfId], references: [id])
+  reversedBy LedgerTransaction?  @relation("LedgerTxReversal")
+
+  @@index([sprintNumber])
+  @@index([sourceKind, sourceRefId])
+  @@index([destKind, destRefId])
+  @@index([teamId])
+  @@index([employeeId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("ledger_transactions")
+}
+
+model MoneyRequest {
+  id                  String             @id @default(cuid())
+  type                MoneyRequestType
+  sprintNumber        Int
+  sourceKind          LedgerRefKind
+  sourceRefId         String
+  destKind            LedgerRefKind
+  destRefId           String
+  teamId              String?
+  amount              Decimal            @db.Decimal(14, 2)
+  reason              String
+  purpose             String?
+  status              MoneyRequestStatus @default(SUBMITTED)
+  requesterId         String
+  approvedById        String?
+  approvedAt          DateTime?
+  rejectionReason     String?
+  postedById          String?
+  postedAt            DateTime?
+  ledgerTransactionId String?
+  idempotencyKey      String?            @unique
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([type, sprintNumber, teamId])
+  @@index([status])
+  @@index([requesterId])
+  @@map("money_requests")
+}
+
+model SprintRanking {
+  id              String              @id @default(cuid())
+  sprintNumber    Int                 @unique
+  entries         Json
+  status          SprintRankingStatus @default(SUBMITTED)
+  submittedById   String
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  poolPostedAt    DateTime?
+  poolPostedById  String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([status])
+  @@map("sprint_rankings")
+}
+
+model PayrollRun {
+  id                       String           @id @default(cuid())
+  sprintNumber             Int
+  kind                     PayrollRunKind
+  teamId                   String?
+  scopeKey                 String           @unique
+  status                   PayrollRunStatus @default(DRAFT)
+  ratePerPerson            Decimal          @db.Decimal(14, 2)
+  headcount                Int
+  totalAmount              Decimal          @db.Decimal(14, 2)
+  rosterSnapshot           Json
+  rosterChangeFlagConsumed Boolean          @default(false)
+  createdById              String
+  confirmedById            String?
+  confirmedAt              DateTime?
+  executedById             String?
+  executedAt               DateTime?
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  @@index([sprintNumber, kind])
+  @@index([teamId])
+  @@map("payroll_runs")
+}
+
+model BonusAward {
+  id                  String           @id @default(cuid())
+  sprintNumber        Int
+  teamId              String
+  employeeId          String
+  criteriaScores      Json
+  totalScore          Decimal          @db.Decimal(5, 2)
+  evidence            String
+  tierAmount          Decimal          @db.Decimal(14, 2)
+  status              BonusAwardStatus @default(SUBMITTED)
+  scoredById          String
+  approvedById        String?
+  approvedAt          DateTime?
+  rejectionReason     String?
+  disbursedById       String?
+  disbursedAt         DateTime?
+  ledgerTransactionId String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@unique([sprintNumber, teamId, employeeId])
+  @@index([sprintNumber, teamId, status])
+  @@index([employeeId])
+  @@map("bonus_awards")
+}
+
+model PenaltyRecord {
+  id                          String          @id @default(cuid())
+  sprintNumber                Int
+  teamId                      String
+  category                    PenaltyCategory
+  grossAmount                 Decimal         @db.Decimal(14, 2)
+  recipientEmployeeId         String?
+  recipientShare              Decimal         @default(0) @db.Decimal(14, 2)
+  companyFundShare            Decimal         @db.Decimal(14, 2)
+  reason                      String
+  status                      PenaltyStatus   @default(RECORDED)
+  recordedById                String
+  approvedById                String?
+  approvedAt                  DateTime?
+  rejectionReason             String?
+  postedById                  String?
+  postedAt                    DateTime?
+  triggersRosterChange        Boolean         @default(false)
+  rosterChangeConsumedByRunId String?
+  ledgerTxIds                 String[]        @default([])
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime        @updatedAt
+
+  @@index([teamId, triggersRosterChange])
+  @@index([sprintNumber, teamId])
+  @@index([status])
+  @@map("penalty_records")
+}
+
+model CommissionRecord {
+  id                  String   @id @default(cuid())
+  sprintNumber        Int      @unique
+  poolBaseAmount      Decimal  @db.Decimal(14, 2)
+  ratePct             Decimal  @db.Decimal(5, 2)
+  amount              Decimal  @db.Decimal(14, 2)
+  cfoEmployeeId       String
+  postedById          String
+  ledgerTransactionId String
+  createdAt           DateTime @default(now())
+
+  @@map("commission_records")
+}
+
+model SprintLock {
+  id            String           @id @default(cuid())
+  sprintNumber  Int              @unique
+  status        SprintLockStatus @default(OPEN)
+  requestedById String?
+  requestedAt   DateTime?
+  approvedById  String?
+  approvedAt    DateTime?
+  reason        String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@map("sprint_locks")
 }
 
 

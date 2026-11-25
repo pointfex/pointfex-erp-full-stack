@@ -902,7 +902,7 @@ export interface AppContextType {
   // CFO Financial State Handlers
   allocateProjectBudget: (projectId: string, newBudget: number, reason?: string) => void
   approveBudgetRequest: (reportId: string, approvedAmount: number, feedback?: string) => void
-  rejectBudgetRequest: (reportId: string, feedback: string) => void
+  rejectBudgetRequest: (reportId: string, feedback: string, mfaCode?: string) => void
   issueFinancialAdjustment: (
     userId: string,
     amount: number,

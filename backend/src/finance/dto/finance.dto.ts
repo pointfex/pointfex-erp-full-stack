@@ -21,6 +21,10 @@ export class AllocateDeveloperBudgetDto {
   @IsOptional()
   @IsNumber()
   week?: number
+
+  @IsOptional()
+  @IsString()
+  idempotencyKey?: string
 }
 
 export class AllocateProjectBudgetDto {

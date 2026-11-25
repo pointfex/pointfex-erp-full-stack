@@ -476,14 +476,28 @@ export const erpApi = {
             'X-MFA-Target': requestId,
           }
         : undefined,
-      body: JSON.stringify({ feedback, reason: feedback }),
+      body: JSON.stringify({ feedback }),
     }),
-  issueFinancialAdjustment: (body: {
-    userId: string
-    amount: number
-    type: 'bonus' | 'penalty'
-    reason: string
-  }) => apiRequest<any>('/finance/adjustment', { method: 'POST', body: JSON.stringify(body) }),
+  issueFinancialAdjustment: (
+    body: {
+      userId: string
+      amount: number
+      type: 'bonus' | 'penalty'
+      reason: string
+    },
+    mfaCode?: string,
+  ) =>
+    apiRequest<any>('/finance/adjustment', {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': 'global',
+          }
+        : undefined,
+      body: JSON.stringify(body),
+    }),
 
   // Performance
   getPerformance: () => apiRequest<any[]>('/performance'),
@@ -1512,4 +1526,413 @@ export const erpApi = {
     }),
   getMyRequestsTimeline: () =>
     apiRequest<any[]>('/projects/my-requests'),
+
+  // ── CFO Finance Suite v2 (/finance/v2/*) ──────────────────────────────────
+  getFinanceConfig: () => apiRequest<any>('/finance/v2/config'),
+  updateFinanceConfig: (body: Record<string, any>, mfaCode?: string) =>
+    apiRequest<any>('/finance/v2/config', {
+      method: 'PATCH',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': 'global',
+          }
+        : undefined,
+      body: JSON.stringify(body),
+    }),
+
+  getFinanceAccounts: () => apiRequest<any>('/finance/v2/accounts'),
+  getFinanceAccountStatement: (
+    accountId: string,
+    params?: { sprintNumber?: number; fromDate?: string; toDate?: string },
+  ) => {
+    const qs = new URLSearchParams()
+    if (params?.sprintNumber) qs.set('sprintNumber', String(params.sprintNumber))
+    if (params?.fromDate) qs.set('fromDate', params.fromDate)
+    if (params?.toDate) qs.set('toDate', params.toDate)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return apiRequest<any>(`/finance/v2/accounts/${accountId}/statement${suffix}`)
+  },
+
+  getFinanceLedgerTransactions: (params?: {
+    sprintNumber?: number
+    type?: string
+    teamId?: string
+    accountId?: string
+    search?: string
+    limit?: number
+  }) => {
+    const qs = new URLSearchParams()
+    if (params?.sprintNumber) qs.set('sprintNumber', String(params.sprintNumber))
+    if (params?.type) qs.set('type', params.type)
+    if (params?.teamId) qs.set('teamId', params.teamId)
+    if (params?.accountId) qs.set('accountId', params.accountId)
+    if (params?.search) qs.set('search', params.search)
+    if (params?.limit) qs.set('limit', String(params.limit))
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return apiRequest<any[]>(`/finance/v2/transactions${suffix}`)
+  },
+
+  exportFinanceLedgerCsv: async (params?: {
+    sprintNumber?: number
+    type?: string
+    teamId?: string
+    accountId?: string
+    search?: string
+  }): Promise<{ csv: string; filename: string }> => {
+    const qs = new URLSearchParams()
+    if (params?.sprintNumber) qs.set('sprintNumber', String(params.sprintNumber))
+    if (params?.type) qs.set('type', params.type)
+    if (params?.teamId) qs.set('teamId', params.teamId)
+    if (params?.accountId) qs.set('accountId', params.accountId)
+    if (params?.search) qs.set('search', params.search)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+
+    const makeHeaders = () => {
+      const h = new Headers()
+      const token = getStoredAccessToken()
+      if (token) h.set('Authorization', `Bearer ${token}`)
+      return h
+    }
+
+    let res = await fetch(`${API_BASE}/finance/v2/transactions/export.csv${suffix}`, {
+      credentials: 'include',
+      headers: makeHeaders(),
+    })
+    if (res.status === 401 && (await attemptSessionRefresh())) {
+      res = await fetch(`${API_BASE}/finance/v2/transactions/export.csv${suffix}`, {
+        credentials: 'include',
+        headers: makeHeaders(),
+      })
+    }
+    if (!res.ok) {
+      throw new ApiError(await parseErrorMessage(res), res.status)
+    }
+
+    const disp = res.headers.get('content-disposition') || ''
+    const match = /filename="([^"]+)"/i.exec(disp)
+    const filename = match?.[1] || 'pointfex-ledger.csv'
+    const csv = await res.text()
+    return { csv, filename }
+  },
+
+  reverseFinanceLedgerTransaction: (id: string, reason: string, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/transactions/${id}/reverse`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': id,
+          }
+        : undefined,
+      body: JSON.stringify({ reason }),
+    }),
+
+  getFinanceSprintLocks: () => apiRequest<any[]>('/finance/v2/sprint-locks'),
+  requestFinanceSprintLock: (sprintNumber: number, reason: string) =>
+    apiRequest<any>(`/finance/v2/sprint-locks/${sprintNumber}/request`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  approveFinanceSprintLock: (sprintNumber: number, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/sprint-locks/${sprintNumber}/approve`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': String(sprintNumber),
+          }
+        : undefined,
+    }),
+
+  getFinanceMoneyRequests: (params?: {
+    type?: string
+    status?: string
+    sprintNumber?: number
+    teamId?: string
+  }) => {
+    const qs = new URLSearchParams()
+    if (params?.type) qs.set('type', params.type)
+    if (params?.status) qs.set('status', params.status)
+    if (params?.sprintNumber) qs.set('sprintNumber', String(params.sprintNumber))
+    if (params?.teamId) qs.set('teamId', params.teamId)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return apiRequest<any[]>(`/finance/v2/money-requests${suffix}`)
+  },
+  createFinanceAddMoneyRequest: (body: {
+    sprintNumber: number
+    destAccountId: string
+    amount: number
+    reason: string
+    purpose?: string
+  }) =>
+    apiRequest<any>('/finance/v2/money-requests/add-money', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  createFinanceTransferRequest: (body: {
+    sprintNumber: number
+    sourceAccountId: string
+    destKind: 'FINANCE_ACCOUNT' | 'PERSONAL_WALLET'
+    destRefId: string
+    amount: number
+    reason: string
+    purpose?: string
+  }) =>
+    apiRequest<any>('/finance/v2/money-requests/transfer', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  approveFinanceMoneyRequest: (id: string, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/money-requests/${id}/approve`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': id,
+          }
+        : undefined,
+    }),
+  rejectFinanceMoneyRequest: (id: string, rejectionReason: string) =>
+    apiRequest<any>(`/finance/v2/money-requests/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ rejectionReason }),
+    }),
+  postFinanceMoneyRequest: (id: string, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/money-requests/${id}/post`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': id,
+          }
+        : undefined,
+    }),
+
+  getFinanceSprintRankings: (sprintNumber?: number) => {
+    const suffix = sprintNumber ? `?sprintNumber=${sprintNumber}` : ''
+    return apiRequest<any[]>(`/finance/v2/sprint-rankings${suffix}`)
+  },
+  submitFinanceSprintRanking: (body: {
+    sprintNumber: number
+    entries: Array<{ teamId: string; rank: number }>
+  }) =>
+    apiRequest<any>('/finance/v2/sprint-rankings', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  approveFinanceSprintRanking: (sprintNumber: number, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/sprint-rankings/${sprintNumber}/approve`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': String(sprintNumber),
+          }
+        : undefined,
+    }),
+  rejectFinanceSprintRanking: (sprintNumber: number, rejectionReason: string) =>
+    apiRequest<any>(`/finance/v2/sprint-rankings/${sprintNumber}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ rejectionReason }),
+    }),
+  postFinanceSprintPoolCredits: (sprintNumber: number, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/sprint-rankings/${sprintNumber}/post-pool`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': String(sprintNumber),
+          }
+        : undefined,
+    }),
+
+  getFinancePayrollRuns: (params?: { sprintNumber?: number; kind?: string; teamId?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.sprintNumber) qs.set('sprintNumber', String(params.sprintNumber))
+    if (params?.kind) qs.set('kind', params.kind)
+    if (params?.teamId) qs.set('teamId', params.teamId)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return apiRequest<any[]>(`/finance/v2/payroll${suffix}`)
+  },
+  runFinanceExecutivePayroll: (sprintNumber: number, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/payroll/executive/${sprintNumber}/run`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': String(sprintNumber),
+          }
+        : undefined,
+    }),
+  generateFinanceSquadPayroll: (sprintNumber: number, teamId: string) =>
+    apiRequest<any>('/finance/v2/payroll/squad/generate', {
+      method: 'POST',
+      body: JSON.stringify({ sprintNumber, teamId }),
+    }),
+  confirmFinanceSquadPayroll: (id: string) =>
+    apiRequest<any>(`/finance/v2/payroll/squad/${id}/confirm`, {
+      method: 'POST',
+    }),
+  executeFinanceSquadPayrollBatch: (
+    body: { sprintNumber: number; runIds?: string[]; teamIds?: string[] },
+    mfaCode?: string,
+  ) =>
+    apiRequest<any>('/finance/v2/payroll/squad/execute-batch', {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': 'global',
+          }
+        : undefined,
+      body: JSON.stringify(body),
+    }),
+
+  getFinanceBonuses: (params?: { sprintNumber?: number; teamId?: string; status?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.sprintNumber) qs.set('sprintNumber', String(params.sprintNumber))
+    if (params?.teamId) qs.set('teamId', params.teamId)
+    if (params?.status) qs.set('status', params.status)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return apiRequest<any[]>(`/finance/v2/bonuses${suffix}`)
+  },
+  scoreFinanceBonus: (body: {
+    sprintNumber: number
+    teamId: string
+    employeeId: string
+    criteriaScores: {
+      delivery: number
+      quality: number
+      ownership: number
+      collaboration: number
+      reliability: number
+    }
+    evidence: string
+  }) =>
+    apiRequest<any>('/finance/v2/bonuses/score', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  approveFinanceBonus: (id: string, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/bonuses/${id}/approve`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': id,
+          }
+        : undefined,
+    }),
+  rejectFinanceBonus: (id: string, rejectionReason: string) =>
+    apiRequest<any>(`/finance/v2/bonuses/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ rejectionReason }),
+    }),
+  disburseFinanceBonus: (id: string, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/bonuses/${id}/disburse`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': id,
+          }
+        : undefined,
+    }),
+  disburseFinanceBonusesBatch: (
+    body: { sprintNumber: number; teamId?: string; awardIds?: string[] },
+    mfaCode?: string,
+  ) =>
+    apiRequest<any>('/finance/v2/bonuses/disburse-batch', {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': 'global',
+          }
+        : undefined,
+      body: JSON.stringify(body),
+    }),
+
+  getFinancePenalties: (params?: {
+    sprintNumber?: number
+    teamId?: string
+    category?: string
+    status?: string
+  }) => {
+    const qs = new URLSearchParams()
+    if (params?.sprintNumber) qs.set('sprintNumber', String(params.sprintNumber))
+    if (params?.teamId) qs.set('teamId', params.teamId)
+    if (params?.category) qs.set('category', params.category)
+    if (params?.status) qs.set('status', params.status)
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return apiRequest<any[]>(`/finance/v2/penalties${suffix}`)
+  },
+  getFinanceRosterChangeFlags: (teamId?: string) => {
+    const suffix = teamId ? `?teamId=${encodeURIComponent(teamId)}` : ''
+    return apiRequest<any[]>(`/finance/v2/penalties/roster-flags${suffix}`)
+  },
+  recordFinancePenalty: (body: {
+    sprintNumber: number
+    teamId: string
+    category: string
+    reason: string
+    recipientEmployeeId?: string
+  }) =>
+    apiRequest<any>('/finance/v2/penalties', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  approveFinancePenalty: (id: string, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/penalties/${id}/approve`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': id,
+          }
+        : undefined,
+    }),
+  rejectFinancePenalty: (id: string, rejectionReason: string) =>
+    apiRequest<any>(`/finance/v2/penalties/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ rejectionReason }),
+    }),
+  postFinancePenalty: (id: string, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/penalties/${id}/post`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': id,
+          }
+        : undefined,
+    }),
+
+  getFinanceCommissions: () => apiRequest<any[]>('/finance/v2/commissions'),
+  runFinanceCommission: (sprintNumber: number, mfaCode?: string) =>
+    apiRequest<any>(`/finance/v2/commissions/${sprintNumber}/run`, {
+      method: 'POST',
+      headers: mfaCode
+        ? {
+            'X-MFA-Code': mfaCode,
+            'X-MFA-Action': 'treasury:transfer',
+            'X-MFA-Target': String(sprintNumber),
+          }
+        : undefined,
+    }),
 }

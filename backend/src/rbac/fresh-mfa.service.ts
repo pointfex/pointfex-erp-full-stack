@@ -3,8 +3,10 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Optional,
 } from '@nestjs/common'
 import * as bcrypt from 'bcrypt'
+import { AuditLoggerService } from '../common/audit-logger.service'
 import { PrismaService } from '../common/prisma.service'
 import { generateTotpCode, isEmployeeCeo } from '../common/security-policy.util'
 import {
@@ -30,7 +32,10 @@ export interface FreshMfaVerifyContext {
 
 @Injectable()
 export class FreshMfaService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly auditLogger?: AuditLoggerService,
+  ) {}
 
   verifyTotpWithStep(secretHex: string, submittedCode: string): {
     valid: boolean
@@ -347,8 +352,7 @@ export class FreshMfaService {
     outcome: string
     mfaVerified: boolean
   }): Promise<void> {
-    await this.prisma.auditLog.create({
-      data: {
+    const auditEntry = {
         actorId: params.actor.id,
         actorName: params.actor.name,
         actorEmail: params.actor.email,
@@ -371,8 +375,12 @@ export class FreshMfaService {
             : null),
         outcome: params.outcome,
         mfaVerified: params.mfaVerified,
-      },
-    })
+      } as const
+    if (this.auditLogger) {
+      await this.auditLogger.log(auditEntry)
+    } else {
+      await this.prisma.auditLog.create({ data: auditEntry })
+    }
   }
 
   async recordChangeHistory(params: {
